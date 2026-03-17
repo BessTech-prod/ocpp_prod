@@ -1,0 +1,173 @@
+/* =============== Design tokens (Light) =============== */
+:root {
+  --brand-bg: #0f172a;  /* slate-900 (fallback för vissa element) */
+  --brand-text: #0b1220;
+  --brand-muted: #64748b;
+
+  /* Bootstrap vars (5.3) */
+  --bs-body-bg: #f8fafc;       /* mycket ljus bakgrund */
+  --bs-body-color: #0f172a;    /* mörk text */
+  --bs-primary: #0ea5e9;       /* cyan accent */
+  --bs-secondary: #64748b;     /* gråblå */
+  --bs-success: #10b981;       /* grön */
+  --bs-info: #0ea5e9;          /* info-blå */
+  --bs-warning: #f59e0b;       /* orange/gul */
+  --bs-danger: #ef4444;        /* röd */
+  --bs-dark: #0b1220;          /* mörkt nav/footer */
+
+  --bs-border-color: #e2e8f0;
+  --bs-card-bg: #ffffff;
+
+  --brand-link: #0ea5e9;
+  --brand-link-hover: #0284c7;
+}
+
+/* =============== Design tokens (Dark) =============== */
+.theme-dark {
+  --bs-body-bg: #0b1220;
+  --bs-body-color: #e2e8f0;
+  --bs-primary: #38bdf8;
+  --bs-secondary: #94a3b8;
+  --bs-success: #34d399;
+  --bs-info: #22d3ee;
+  --bs-warning: #fbbf24;
+  --bs-danger: #f87171;
+  --bs-dark: #0b1220;
+
+  --bs-card-bg: #0f172a;
+  --bs-border-color: #243042;
+
+  --brand-link: #38bdf8;
+  --brand-link-hover: #7dd3fc;
+}
+
+/* =============== Bas =============== */
+html, body {
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+a, .btn-link {
+  color: var(--brand-link);
+}
+a:hover, .btn-link:hover {
+  color: var(--brand-link-hover);
+}
+
+/* Navbar */
+.navbar.bg-dark {
+  background-color: var(--bs-dark) !important;
+}
+.brand-logo {
+  height: 80px;
+  width: auto;
+  object-fit: contain;
+}
+.brand-logo-login {
+  height: 270px;
+  width: auto;
+  object-fit: contain;
+  }
+
+/* Kort och tabeller */
+.card {
+  background-color: var(--bs-card-bg);
+  border-color: var(--bs-border-color);
+}
+.table {
+  --bs-table-color: var(--bs-body-color);
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--bs-border-color);
+}
+
+/* Badges tweak */
+.badge.bg-warning { color: #111827 !important; }
+.badge.bg-info    { color: #0b1220 !important; }
+
+/* Små hjälpare */
+.btn-icon {
+  display: inline-flex; align-items: center; gap: .4rem;
+}
+.spinner-inline {
+  width: 1rem; height: 1rem; border-width: .15rem;
+}
+
+/* Toast container placering */
+#toast-stack {
+  position: fixed; bottom: 16px; right: 16px; z-index: 1080;
+}
+
+/* Formular-indikatorer */
+.was-validated .form-control:invalid,
+.form-control.is-invalid {
+  border-color: var(--bs-danger);
+}
+.was-validated .form-control:valid,
+.form-control.is-valid {
+  border-color: var(--bs-success);
+}
+/* ----- Statusbadges (endast laddstatus) ----- */
+.badge.status-charging {
+  background-color: #0ea5e9;  /* grön */
+  color: #0b1220;             /* mörk text för kontrast */
+}
+.badge.status-available {
+  background-color:#22c55e ;  /* cyan/blå */
+  color: #0b1220;
+}
+.badge.status-suspended {
+  background-color: #f59e0b;  /* orange/gul */
+  color: #111827;
+}
+
+/* (valfritt) matcha övriga statusar också */
+.badge.status-preparing   { background-color: #fde047; color: #111827; }
+.badge.status-faulted     { background-color: #ef4444; color: #ffffff; }
+.badge.status-unavailable { background-color: #334155; color: #ffffff; }
+.badge.status-unknown     { background-color: #64748b; color: #ffffff; }
+.badge.status-charging  { background:#0ea5e9; color:#0b1220; }
+.badge.status-available { background:#22c55e; color:#0b1220; }
+.badge.status-suspended { background:#f59e0b; color:#111827; }
+/* övriga: status-preparing, status-faulted, status-unavailable, status-unknown ... */
+
+/* === Brand / logotyp i navbar === */
+.navbar .brand-logo {
+  height: 86px;            /* större och tydlig */
+  width: auto;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+@media (min-width: 1200px) {
+  .navbar .brand-logo { height: 50px; }
+}
+
+.navbar .brand-text {
+  font-weight: 800;
+  letter-spacing: .02em;
+  font-size: 1rem;
+  color: #e5e7eb;          /* ljus text i mörk navbar */
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-left: .5rem;
+}
+
+@media (max-width: 420px) {
+  .navbar .brand-text { display: none; }
+}
+
+/* Om du vill auto‑byta logotyp mellan dark/light: lägg in logo_dark.png och avkommentera nedan.
+.theme-dark .navbar .brand-logo[data-variant="auto"] { content: url("/assets/logo_trans_vit.png"); }
+.theme-light .navbar .brand-logo[data-variant="auto"] { content: url("/assets/logo_dark.png"); }
+*/
+
+/* Ge navbaren lite mer luft så loggan “andas” */
+.navbar.bg-dark {
+  padding-top: .65rem !important;
+  padding-bottom: .65rem !important;
+}
+@media (min-width: 992px) {
+  .navbar.bg-dark {
+    padding-top: .75rem !important;
+    padding-bottom: .75rem !important;
+  }
+}

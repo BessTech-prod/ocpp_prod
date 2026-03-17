@@ -1,0 +1,12 @@
+[
+  {
+    "transaction_id": 1,
+    "charge_point": "laddbox_kontor/laddbox_kontor",
+    "connectorId": 2,
+    "id_tag": "8B3D028A",
+    "start_time": "2026-03-16T04:59:15Z",
+    "meter_start": 77253,
+    "stop_time": "2026-03-16T05:46:47Z",
+    "meter_stop": 82484
+  }
+]
