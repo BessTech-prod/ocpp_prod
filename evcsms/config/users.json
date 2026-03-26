@@ -1,0 +1,118 @@
+{
+  "E3884WAS": {
+    "first_name": "Linn",
+    "last_name": "Dahlström",
+    "name": "Linn Dahlström",
+    "email": "linn@dahlstrom.se",
+    "role": "user",
+    "org_id": "Takorama_Storås",
+    "pwd_salt": "5ZPbgtVEo5-nAh82XfMZHA",
+    "pwd_hash": "g7-Mzm8wu7YvgecqkyUDaf0X0NZmScA-GIvbBxTzokQ"
+  },
+  "8B3D028A": {
+    "first_name": "Hugo",
+    "last_name": "Danielsson",
+    "name": "Hugo Danielsson",
+    "email": "hugo@takorama.se",
+    "role": "org_admin",
+    "org_id": "Takorama_Storås",
+    "pwd_salt": "Y1qyNGXOXz7fRgMkUzuEMA",
+    "pwd_hash": "GjJMtdrB6jBM8SBHof3L9P4ik7HpR3ZucuFk_YojPAE"
+  },
+  "4BC5918A": {
+    "first_name": "Magnus",
+    "last_name": "Kallin",
+    "name": "Magnus Kallin",
+    "email": "magnus@takorama.se",
+    "role": "org_admin",
+    "org_id": "Takorama_Storås",
+    "pwd_salt": "lCOWRBuB6I0_l5iKQj6Ddg",
+    "pwd_hash": "Nfxb3jcSE8uu2kggihmSwpgEW-TXSQSS5q6_ZSQpOoI"
+  },
+  "12345687": {
+    "first_name": "test",
+    "last_name": "användare",
+    "name": "test användare",
+    "email": "user@takorama.se",
+    "role": "user",
+    "org_id": "kaefer_std",
+    "pwd_salt": "gffaYHs9Pp0M2EomeXOu0g",
+    "pwd_hash": "VSNsiFNMqh0u8vylXRStA7GePDmYd48XBfEYcsn6S_E"
+  },
+  "8Y2OJPDQIHH2": {
+    "first_name": "admin",
+    "last_name": "User",
+    "name": "admin User",
+    "email": "admin@takorama.se",
+    "role": "portal_admin",
+    "org_id": "default",
+    "pwd_salt": "oBMxBNM36DgZ1bnRTJ_uKw",
+    "pwd_hash": "VrnpvF8SKDbEn4NRrIdixTgw3sOqswVxX80AfLw8sy0"
+  },
+  "UNSET-E7BFFBBB": {
+    "first_name": "Erik",
+    "last_name": "Ek",
+    "name": "Erik Ek",
+    "email": "erik@example.com",
+    "role": "org_admin",
+    "org_id": "Takorama_Storås"
+  },
+  "E364657HJSH": {
+    "first_name": "Anna",
+    "last_name": "Andersson",
+    "name": "Anna Andersson",
+    "email": "anna@example.com",
+    "role": "user",
+    "org_id": "Takorama_Storås"
+  },
+  "UNSET-BC0C2AD3": {
+    "first_name": "Sofia",
+    "last_name": "Danielsson Mereus",
+    "name": "Sofia Danielsson Mereus",
+    "email": "sodia.mereus@gmail.com",
+    "role": "user",
+    "org_id": "Takorama_Storås",
+    "pwd_salt": "F3WIeBq9n9Jxqe7oS7VKjg",
+    "pwd_hash": "fCqK69wvNCROAX3S6wkqdhiZvrKs28eOFNdQR4AT0AM"
+  },
+  "UNSET-3E78C7D9": {
+    "first_name": "Fredrik",
+    "last_name": "Melander",
+    "name": "Fredrik Melander",
+    "email": "fredrik.melander@takorama.se",
+    "role": "user",
+    "org_id": "Takorama_Storås",
+    "pwd_salt": "YPyWTW0hhSfTAIIG7UdTPg",
+    "pwd_hash": "x4dJ6OYgpJzov6GpCyoqUewNoAhu9qf1ohLAi0ceMiY"
+  },
+  "34JJH3UH3": {
+    "first_name": "Hannele",
+    "last_name": "Danielsson Mereus",
+    "name": "Hannele Danielsson Mereus",
+    "email": "rutstina95@gmail.com",
+    "role": "user",
+    "org_id": "Takorama_Storås",
+    "pwd_salt": "ZNwo6p7vR8V2p61lGNty8g",
+    "pwd_hash": "f2wADAcQkTJHPT-RowgFAyxeiSAgVWerSy6mxUCCEgY"
+  },
+  "C8D00B9F": {
+    "first_name": "org",
+    "last_name": "admin",
+    "name": "org admin",
+    "email": "orgadmin@takorama.se",
+    "role": "org_admin",
+    "org_id": "Takorama_Storås",
+    "pwd_salt": "ymgeZ00lIuOR6_W5gX3s4w",
+    "pwd_hash": "LzaUI43RzsxK6qFwODKqSGNl9FJ0_gYFfhYG4aZrZT8"
+  },
+  "5BB6EA8A": {
+    "first_name": "magnud",
+    "last_name": "mustachAB",
+    "name": "magnud mustachAB",
+    "email": "mustach@mycket.se",
+    "role": "user",
+    "org_id": "Takorama_Storås",
+    "pwd_salt": "r99_9YVWps76ObwtMJySrQ",
+    "pwd_hash": "uOUq530JV6DWmHnAqcpWbtsPQImTl8DUyG3LBFimZUQ"
+  }
+}

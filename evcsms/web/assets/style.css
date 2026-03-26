@@ -1,0 +1,696 @@
+/* =============== Design tokens (Light) =============== */
+:root {
+  /* Takorama-inspired brand palette: red-purple → purple → deep blue-purple */
+  --takorama-raspberry:  #A30060;   /* takorama.se --soltech-color--raspberry */
+  --takorama-violet:     #301760;   /* takorama.se --soltech-color--violet     */
+  --takorama-purple:     #6B21A8;   /* mid purple bridge                       */
+  --takorama-deep-blue:  #1E1B4B;   /* deep indigo / blue-purple               */
+  --takorama-gradient:   linear-gradient(135deg, #A30060 0%, #6B21A8 50%, #1E1B4B 100%);
+
+  --brand-bg: #1E1B4B;
+  --navbar-brand-bg: #1a0830; /* dark base behind logo */
+  --brand-text: #0b1220;
+  --brand-muted: #64748b;
+
+  /* Bootstrap vars (5.3) */
+  --bs-body-bg: #f8fafc;
+  --bs-body-color: #0f172a;
+  --bs-primary: #A30060;       /* raspberry accent */
+  --bs-secondary: #6B21A8;     /* purple */
+  --bs-success: #10b981;
+  --bs-info: #7C3AED;          /* violet-info */
+  --bs-warning: #f59e0b;
+  --bs-danger: #ef4444;
+  --bs-dark: #1E1B4B;          /* deep blue-purple */
+
+  --bs-border-color: #e2e8f0;
+  --bs-card-bg: #ffffff;
+
+  --brand-link: #A30060;
+  --brand-link-hover: #7C1048;
+}
+
+/* =============== Design tokens (Dark) =============== */
+.theme-dark {
+  --navbar-brand-bg: #12082a;
+  --bs-body-bg: #0f0a1e;
+  --bs-body-color: #e2e8f0;
+  --bs-primary: #D946A8;
+  --bs-secondary: #A78BFA;
+  --bs-success: #34d399;
+  --bs-info: #A78BFA;
+  --bs-warning: #fbbf24;
+  --bs-danger: #f87171;
+  --bs-dark: #1E1B4B;
+
+  --bs-card-bg: #1a1030;
+  --bs-border-color: #3B2069;
+
+  --brand-link: #D946A8;
+  --brand-link-hover: #F472B6;
+}
+
+/* =============== Bas =============== */
+html, body {
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+a, .btn-link {
+  color: var(--brand-link);
+}
+a:hover, .btn-link:hover {
+  color: var(--brand-link-hover);
+}
+
+/* Navbar — Takorama gradient: raspberry → purple → deep violet */
+.navbar.bg-dark {
+  background: var(--takorama-gradient) !important;
+  border-bottom: 1px solid rgba(163, 0, 96, .35);
+  box-shadow: 0 2px 16px rgba(48, 23, 96, .55);
+}
+.brand-logo {
+  height: 80px;
+  width: auto;
+  object-fit: contain;
+}
+.brand-logo-login {
+  display: block;
+  margin: 0 auto;
+  max-width: 75%;
+  max-height: 140px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Kort och tabeller */
+.card {
+  background-color: var(--bs-card-bg);
+  border-color: var(--bs-border-color);
+  border-radius: 1.05rem;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .06);
+}
+.table {
+  --bs-table-color: var(--bs-body-color);
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--bs-border-color);
+}
+
+.app-shell {
+  max-width: 1240px;
+  padding-top: .5rem;
+  padding-bottom: 2rem;
+}
+
+.app-shell > #alerts,
+.app-shell > #page-alerts {
+  margin-bottom: 1rem;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem 1.35rem;
+  margin-bottom: 1.25rem;
+  background:
+    linear-gradient(135deg, rgba(163, 0, 96, .06) 0%, rgba(107, 33, 168, .08) 100%),
+    rgba(255,255,255,.96);
+  border: 1px solid rgba(163, 0, 96, .10);
+  border-radius: 1.15rem;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .06);
+}
+
+
+.page-subtitle {
+  margin: .4rem 0 0;
+  color: var(--brand-muted);
+  max-width: 66ch;
+}
+
+.content-panel,
+.toolbar-panel,
+.table-panel,
+.status-legend-panel {
+  background: rgba(255,255,255,.96);
+  border: 1px solid rgba(226, 232, 240, .95);
+  border-radius: 1.1rem;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .05);
+}
+
+.content-panel {
+  padding: 1.2rem 1.25rem;
+}
+
+.toolbar-panel {
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.table-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.table-panel .table {
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.status-legend-panel {
+  padding: 1rem 1.15rem;
+}
+
+.stats-grid {
+  margin-bottom: 1.25rem;
+}
+
+.stats-grid .card,
+.app-shell .metric-card {
+  border: 1px solid rgba(226, 232, 240, .95);
+}
+
+.back-link-wrap {
+  margin-top: 1.4rem;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .72rem 1rem;
+  border-radius: .85rem;
+  background: rgba(255,255,255,.9);
+  border: 1px solid rgba(163, 0, 96, .10);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, .05);
+  color: var(--brand-link);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  background: rgba(255,255,255,1);
+  color: var(--brand-link-hover);
+}
+
+.section-stack > * + * {
+  margin-top: 1rem;
+}
+
+.table thead.table-dark,
+.import-result-header {
+  background: linear-gradient(135deg, rgba(163, 0, 96, .92) 0%, rgba(48, 23, 96, .96) 100%);
+}
+
+.table-panel .table thead.table-dark th {
+  background: transparent !important;
+  --bs-table-bg: transparent !important;
+  --bs-table-accent-bg: transparent !important;
+  border: 0;
+  color: #fff;
+  font-weight: 600;
+  font-size: .8125rem;
+  padding: .55rem .75rem;
+  vertical-align: middle;
+}
+
+.table-panel .table thead.table-dark th:first-child {
+  padding-left: 1rem;
+}
+
+.table-panel .table thead.table-dark th:last-child {
+  padding-right: 1rem;
+}
+
+.table-panel .table tbody td {
+  padding: .65rem .75rem;
+  vertical-align: middle;
+}
+
+.table-panel .table tbody td:first-child {
+  padding-left: 1rem;
+}
+
+.table-panel .table tbody td:last-child {
+  padding-right: 1rem;
+}
+
+/* Standalone solid header bar for import result tables.
+   Completely decoupled from the table's column rendering so the
+   gradient always covers 100 % of the container width. */
+.import-result-header {
+  display: grid;
+  width: 100%;
+  color: #fff;
+  font-weight: 600;
+  font-size: .8125rem;
+  border-radius: 1.1rem 1.1rem 0 0;
+}
+
+.import-result-header > span {
+  padding: .35rem .5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-control,
+.form-select,
+.input-group-text {
+  border-radius: .8rem;
+}
+
+.input-group > .form-control,
+.input-group > .form-select,
+.input-group > .btn,
+.input-group > .input-group-text {
+  min-height: 2.75rem;
+}
+
+.app-shell hr {
+  border-color: rgba(163, 0, 96, .12);
+}
+
+.org-create-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  width: min(100%, 860px);
+}
+
+.org-create-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: .45rem .75rem;
+  border-radius: .8rem;
+  border: 1px solid var(--bs-border-color);
+  background: #f8fafc;
+  white-space: nowrap;
+}
+
+.org-create-row .org-create-id {
+  flex: 1 1 200px;
+  min-width: 180px;
+}
+
+.org-create-row .org-create-name {
+  flex: 2 1 300px;
+  min-width: 230px;
+}
+
+.org-create-row .btn {
+  min-height: 2.75rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .org-create-row {
+    width: 100%;
+  }
+
+  .org-create-label,
+  .org-create-row .org-create-id,
+  .org-create-row .org-create-name,
+  .org-create-row .btn {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* Badges tweak */
+.badge.bg-warning { color: #111827 !important; }
+.badge.bg-info    { color: #0b1220 !important; }
+
+/* Små hjälpare */
+.btn-icon {
+  display: inline-flex; align-items: center; gap: .4rem;
+}
+.spinner-inline {
+  width: 1rem; height: 1rem; border-width: .15rem;
+}
+
+.ocpp-send-btn {
+  width: 190px;
+  min-height: 2.5rem;
+  white-space: nowrap;
+}
+
+/* Toast container placering */
+#toast-stack {
+  position: fixed; bottom: 16px; right: 16px; z-index: 1080;
+}
+
+/* Formular-indikatorer */
+.was-validated .form-control:invalid,
+.form-control.is-invalid {
+  border-color: var(--bs-danger);
+}
+.was-validated .form-control:valid,
+.form-control.is-valid {
+  border-color: var(--bs-success);
+}
+/* ----- Statusbadges (endast laddstatus) ----- */
+.badge.status-charging {
+  background-color: #0ea5e9;  /* grön */
+  color: #0b1220;             /* mörk text för kontrast */
+}
+.badge.status-available {
+  background-color:#22c55e ;  /* cyan/blå */
+  color: #0b1220;
+}
+.badge.status-suspended {
+  background-color: #f59e0b;  /* orange/gul */
+  color: #111827;
+}
+
+/* (valfritt) matcha övriga statusar också */
+.badge.status-preparing   { background-color: #fde047; color: #111827; }
+.badge.status-faulted     { background-color: #ef4444; color: #ffffff; }
+.badge.status-unavailable { background-color: #334155; color: #ffffff; }
+.badge.status-unknown     { background-color: #64748b; color: #ffffff; }
+.badge.status-charging  { background:#0ea5e9; color:#0b1220; }
+.badge.status-available { background:#22c55e; color:#0b1220; }
+.badge.status-suspended { background:#f59e0b; color:#111827; }
+/* övriga: status-preparing, status-faulted, status-unavailable, status-unknown ... */
+
+/* === Brand / logotyp i navbar === */
+.navbar .container-fluid {
+  align-items: center;
+  column-gap: 1rem;
+}
+
+.navbar .brand-logo {
+  height: 52px;
+  max-width: min(42vw, 190px);
+  width: auto;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.navbar .navbar-brand {
+  gap: .85rem;
+  min-width: 0;
+  margin-right: .75rem;
+  padding-top: .15rem;
+  padding-bottom: .15rem;
+}
+
+@media (min-width: 992px) {
+  .navbar .navbar-brand {
+    flex: 0 0 auto;
+    margin-right: 1.25rem;
+  }
+}
+
+.navbar .brand-text {
+  font-weight: 800;
+  letter-spacing: .02em;
+  font-size: 1rem;
+  color: #e5e7eb;          /* ljus text i mörk navbar */
+  text-transform: uppercase;
+  white-space: nowrap;
+  margin-left: 0;
+}
+
+.navbar .navbar-collapse {
+  align-items: center;
+}
+
+.navbar .navbar-nav {
+  row-gap: .35rem;
+  column-gap: .35rem;
+}
+
+.navbar .nav-link,
+.navbar .nav-item > .btn,
+.navbar .navbar-text {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 2.5rem;
+  white-space: nowrap;
+  border-radius: .7rem;
+}
+
+.navbar .nav-link {
+  padding: .45rem .8rem;
+  border-bottom: 2px solid transparent;
+  opacity: .92;
+}
+
+.navbar .nav-item > .btn {
+  padding: .45rem .8rem;
+}
+
+.navbar .navbar-text {
+  padding: .45rem .25rem;
+}
+
+.account-info-card {
+  background: linear-gradient(180deg, rgba(255,255,255,.98) 0%, rgba(248,250,252,.98) 100%);
+  border: 1px solid rgba(163, 0, 96, .10);
+}
+
+.account-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.account-info-label {
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: .2rem;
+}
+
+.account-info-value {
+  font-size: .97rem;
+  font-weight: 600;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+@media (max-width: 420px) {
+  .navbar .brand-logo { height: 44px; }
+  .navbar .brand-text { display: none; }
+}
+
+/* Om du vill auto‑byta logotyp mellan dark/light: lägg in logo_dark.png och avkommentera nedan.
+.theme-dark .navbar .brand-logo[data-variant="auto"] { content: url("/assets/logo_trans_vit.png"); }
+.theme-light .navbar .brand-logo[data-variant="auto"] { content: url("/assets/logo_dark.png"); }
+*/
+
+/* Ge navbaren lite mer luft så loggan “andas” */
+.navbar.bg-dark {
+  padding-top: .65rem !important;
+  padding-bottom: .65rem !important;
+}
+@media (min-width: 992px) {
+  .navbar.bg-dark {
+    padding-top: .75rem !important;
+    padding-bottom: .75rem !important;
+  }
+}
+
+
+/* ===== Takorama brand login background ===== */
+/* Colour palette sourced from takorama.se navbar:            */
+/* Raspberry: #A30060  |  Violet: #301760  |  Deep Indigo: #1E1B4B */
+.login-page {
+  position: relative;
+  overflow: hidden;
+  background: #1a0838;
+  min-height: 100vh;
+}
+
+.login-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 90% 70% at 15%  85%,  rgba(107,  33, 168, .80) 0%, transparent 60%),
+    radial-gradient(ellipse 90% 70% at 80%  80%,  rgba(163,   0,  96, .85) 0%, transparent 60%),
+    radial-gradient(ellipse 75% 60% at 50%  40%,  rgba(107,  33, 168, .65) 0%, transparent 60%),
+    radial-gradient(ellipse 75% 60% at 88%  15%,  rgba(163,   0,  96, .75) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 50% at 10%  20%,  rgba(107,  33, 168, .60) 0%, transparent 60%),
+    linear-gradient(160deg, #1a0838 0%, #7b1060 35%, #5b21b6 65%, #1a0838 100%);
+  animation: tako-pulse 9s ease-in-out infinite alternate;
+}
+
+.login-page::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    radial-gradient(circle 1px at 12%  18%, rgba(163,  0,  96, .40) 0%, transparent 1px),
+    radial-gradient(circle 1px at 78%  12%, rgba(107, 33, 168, .30) 0%, transparent 1px),
+    radial-gradient(circle 2px at 42%  50%, rgba( 48, 23,  96, .25) 0%, transparent 2px),
+    radial-gradient(circle 1px at 88%  62%, rgba(163,  0,  96, .35) 0%, transparent 1px),
+    radial-gradient(circle 1px at 22%  72%, rgba(107, 33, 168, .25) 0%, transparent 1px),
+    radial-gradient(circle 2px at 58%  82%, rgba( 48, 23,  96, .22) 0%, transparent 2px),
+    radial-gradient(circle 1px at 35%  30%, rgba(163,  0,  96, .20) 0%, transparent 1px);
+  animation: tako-stars 13s ease-in-out infinite alternate;
+}
+
+@keyframes tako-pulse {
+  0%   { opacity: .80; transform: scale(1)    translateY(0px); }
+  50%  { opacity: 1;   transform: scale(1.04) translateY(-10px); }
+  100% { opacity: .88; transform: scale(1.01) translateY(-5px); }
+}
+
+@keyframes tako-stars {
+  0%   { opacity: .55; transform: translateY(0px); }
+  100% { opacity: 1;   transform: translateY(-14px); }
+}
+
+.login-bg-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 5, 22, .10);
+  z-index: 1;
+}
+
+.login-content {
+  position: relative;
+  z-index: 2;
+}
+
+.login-card {
+  background: rgba(255, 255, 255, .96);
+  backdrop-filter: blur(6px);
+  border-top: 3px solid #A30060 !important;
+  box-shadow: 0 8px 36px rgba(163, 0, 96, .22), 0 2px 10px rgba(48, 23, 96, .28) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-page::before,
+  .login-page::after {
+    animation: none;
+  }
+}
+
+/* ===== Global hover feel ===== */
+.nav-link,
+.btn,
+.card,
+.table tbody tr {
+  transition: all .18s ease;
+}
+
+.navbar .nav-link:hover {
+  color: #ffffff !important;
+  opacity: 1;
+  background: rgba(255, 255, 255, .08);
+}
+
+.navbar .nav-link.active {
+  color: #ffffff !important;
+  font-weight: 600;
+  border-bottom-color: rgba(255, 160, 200, .85);
+  background: rgba(255, 255, 255, .08);
+}
+
+@media (max-width: 991.98px) {
+  .navbar .navbar-brand {
+    margin-right: 0;
+  }
+
+  .navbar .navbar-collapse {
+    padding-top: .85rem;
+  }
+
+  .navbar .navbar-nav {
+    align-items: stretch !important;
+  }
+
+  .navbar .nav-link,
+  .navbar .nav-item > .btn {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .navbar .navbar-text {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .account-info-grid {
+    grid-template-columns: 1fr;
+    gap: .75rem;
+  }
+
+  .page-header {
+    padding: 1rem 1rem;
+  }
+
+  .content-panel,
+  .toolbar-panel,
+  .status-legend-panel {
+    padding: 1rem;
+  }
+}
+
+.table tbody tr:hover {
+  background-color: rgba(163, 0, 96, .06);
+}
+
+main .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 .4rem .9rem rgba(2, 6, 23, .08) !important;
+}
+
+.table tbody tr:hover {
+  background-color: rgba(14, 165, 233, .06);
+}
+
+/* ===== Initial loading skeleton ===== */
+.skeleton {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+  border-radius: .4rem;
+}
+
+.skeleton-line {
+  height: .9rem;
+  margin-bottom: .55rem;
+}
+
+.skeleton-line:last-child {
+  margin-bottom: 0;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+body:not(.app-ready) main .card,
+body:not(.app-ready) main .table-responsive {
+  position: relative;
+  overflow: hidden;
+}
+
+body:not(.app-ready) main .card * {
+  color: transparent !important;
+}
+
+body:not(.app-ready) main .card::after,
+body:not(.app-ready) main .table-responsive::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+

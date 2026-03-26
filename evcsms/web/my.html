@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <title>TakoramaCharge – Min statistik</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
+    <div class="container-fluid">
+      <a href="javascript:void(0)" class="navbar-brand d-flex align-items-center js-go-dashboard">
+        <img src="/assets/logo_trans_vit.png" srcset="/assets/logo_trans_vit.png 2x" class="brand-logo" alt="TakoramaCharge">
+        <span class="brand-text ms-2">Min Statistik</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse justify-content-end" id="navMain">
+        <ul class="navbar-nav align-items-center gap-2">
+          <li class="nav-item"><a class="nav-link js-go-dashboard" href="javascript:void(0)"><i class="bi bi-speedometer2"></i> Överblick</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin"><a class="nav-link" href="/portal/live_ops.html"><i class="bi bi-broadcast-pin"></i> Live driftpanel</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin"><a class="nav-link" href="/portal/cps.html"><i class="bi bi-diagram-3"></i> Laddare</a></li>
+          <li class="nav-item" data-visible-roles="org_admin,portal_admin,admin"><a href="#" class="nav-link" data-route-portal="/portal/rfid.html" data-route-org="/org/rfid.html" data-route-user="/user/index.html"><i class="bi bi-upc-scan"></i> RFID</a></li>
+          <li class="nav-item" data-visible-roles="org_admin,portal_admin,admin"><a href="#" class="nav-link" data-route-portal="/portal/add_user.html" data-route-org="/org/add_user.html" data-route-user="/user/index.html"><i class="bi bi-person-plus"></i> Användare</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin"><a class="nav-link" href="/orgs.html"><i class="bi bi-building-gear"></i> Organisationer</a></li>
+          <li class="nav-item" data-visible-roles="org_admin,portal_admin,admin"><a href="#" class="nav-link" data-route-portal="/users_history.html" data-route-org="/org/history.html" data-route-user="/user/index.html"><i class="bi bi-clock-history"></i> Historik</a></li>
+          <li class="nav-item"><a href="#" class="nav-link" data-route-portal="/my.html" data-route-org="/org/my.html" data-route-user="/user/my.html"><i class="bi bi-person-badge"></i> Min statistik</a></li>
+
+          <li class="nav-item"><span id="me-display" class="navbar-text small text-light opacity-75"></span></li>
+          <li class="nav-item"><button id="btnLogout" class="btn btn-outline-light btn-sm" type="button"><i class="bi bi-box-arrow-right"></i> Logga ut</button></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container my-4 app-shell">
+    <div id="page-alerts"></div>
+    <div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+    <section class="mb-4 page-header">
+      <div class="d-flex align-items-center justify-content-between">
+        <h1 class="h4 m-0" id="title">Hej!</h1>
+        <div class="input-group" style="max-width: 260px;">
+          <span class="input-group-text">Dagar</span>
+          <input id="days" type="number" min="1" max="365" class="form-control" value="30">
+          <button id="btnRefresh" class="btn btn-outline-secondary" type="button"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+      </div>
+      <p class="text-muted mb-0">Översikt över dina laddsessioner.</p>
+    </section>
+
+    <section class="row g-3 stats-grid">
+      <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm h-100 metric-card"><div class="card-body">
+          <h5 class="card-title d-flex align-items-center gap-2"><i class="bi bi-lightning-charge"></i> Energi</h5>
+          <div class="display-6" id="stat-kwh">–</div><div class="text-muted">kWh under perioden</div>
+        </div></div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm h-100 metric-card"><div class="card-body">
+          <h5 class="card-title d-flex align-items-center gap-2"><i class="bi bi-hash"></i> Sessioner</h5>
+          <div class="display-6" id="stat-sessions">–</div><div class="text-muted">antal under perioden</div>
+        </div></div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm h-100 metric-card"><div class="card-body">
+          <h5 class="card-title d-flex align-items-center gap-2"><i class="bi bi-calendar2"></i> Period</h5>
+          <div class="display-6" id="stat-days">–</div><div class="text-muted">dagar</div>
+        </div></div>
+      </div>
+    </section>
+
+    <section class="mt-4">
+      <div class="card border-0 shadow-sm account-info-card">
+        <div class="card-body">
+          <h2 class="h6 mb-3 d-flex align-items-center gap-2"><i class="bi bi-person-vcard"></i> Kontoinformation</h2>
+          <div class="account-info-grid">
+            <div>
+              <div class="account-info-label">Account</div>
+              <div class="account-info-value" id="account-email">–</div>
+            </div>
+            <div>
+              <div class="account-info-label">Organisation</div>
+              <div class="account-info-value" id="account-org">–</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="back-link-wrap">
+      <a href="javascript:void(0)" class="js-go-dashboard back-link">← Tillbaka till överblick</a>
+    </div>
+  </main>
+
+  <footer class="text-center text-muted small py-3"></footer>
+
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/assets/ui-common.js"></script>
+  <script src="/assets/my.js?v=3"></script>
+</body>
+</html>

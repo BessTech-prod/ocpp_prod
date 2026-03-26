@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <title>TakoramaCharge – Överblick</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="bg-light">
+
+  <!-- NAVBAR -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
+    <div class="container-fluid">
+
+      <!-- BRAND -->
+      <a href="javascript:void(0)" class="navbar-brand d-flex align-items-center js-go-dashboard">
+        <img src="/assets/logo_trans_vit.png" srcset="/assets/logo_trans_vit.png 2x"
+             class="brand-logo" alt="TakoramaCharge">
+        <span class="brand-text ms-2">Överblick</span>
+      </a>
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain"
+              aria-controls="navMain" aria-expanded="false" aria-label="Visa meny">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div id="navMain" class="collapse navbar-collapse justify-content-end">
+        <ul class="navbar-nav align-items-center gap-2">
+
+          <!-- Överblick -->
+          <li class="nav-item">
+            <a href="javascript:void(0)" class="nav-link js-go-dashboard"><i class="bi bi-speedometer2"></i> Överblick</a>
+          </li>
+
+          <!-- Roll‑medvetna länkar -->
+          <li class="nav-item">
+            <a href="#" class="nav-link"
+               data-route-portal="/portal/rfid.html"
+               data-route-org="/org/rfid.html"
+               data-route-user="/user/index.html"><i class="bi bi-upc-scan"></i> RFID</a>
+          </li>
+          <li class="nav-item">
+            <a href="#" class="nav-link"
+               data-route-portal="/portal/add_user.html"
+               data-route-org="/org/add_user.html"
+               data-route-user="/user/index.html"><i class="bi bi-person-plus"></i> Användare</a>
+          </li>
+          <li class="nav-item">
+            <a href="#" class="nav-link"
+               data-route-portal="/users_history.html"
+               data-route-org="/org/history.html"
+               data-route-user="/user/index.html"><i class="bi bi-clock-history"></i> Historik</a>
+          </li>
+          <li class="nav-item">
+            <a href="#" class="nav-link"
+               data-route-portal="/my.html"
+               data-route-org="/org/my.html"
+               data-route-user="/user/my.html"><i class="bi bi-person-badge"></i> Min statistik</a>
+          </li>
+
+
+
+          <!-- Inloggad + Logout + tidsstämpel -->
+          <li class="nav-item"><span id="me-display" class="navbar-text small text-light opacity-75"></span></li>
+          <li class="nav-item">
+            <button id="btnLogout" class="btn btn-outline-light btn-sm" type="button">
+              <i class="bi bi-box-arrow-right"></i> Logga ut
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- INNEHÅLL -->
+  <main class="container my-4 app-shell">
+    <div id="alerts"></div>
+
+    <section class="page-header">
+      <div>
+        <h1 class="h3 m-0">Mina uttag</h1>
+        <p class="page-subtitle">Snabb översikt över organisationens lediga, laddande uttag.</p>
+      </div>
+    </section>
+
+    <div id="cp-status-cards" class="row g-3 stats-grid">
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Lediga uttag</div><div class="h3 m-0 skeleton" style="height:2rem;"></div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Laddar nu</div><div class="h3 m-0 skeleton" style="height:2rem;"></div></div></div></div>
+      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Uttag ur drift</div><div class="h3 m-0 skeleton" style="height:2rem;"></div></div></div></div>
+    </div>
+    <div id="cp-grid" class="row g-3">
+      <div class="col-12 col-md-6 col-lg-4"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="skeleton" style="height:1.2rem;max-width:70%;"></div><div class="skeleton mt-3" style="height:1rem;"></div><div class="skeleton mt-2" style="height:1rem;"></div></div></div></div>
+      <div class="col-12 col-md-6 col-lg-4"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="skeleton" style="height:1.2rem;max-width:70%;"></div><div class="skeleton mt-3" style="height:1rem;"></div><div class="skeleton mt-2" style="height:1rem;"></div></div></div></div>
+      <div class="col-12 col-md-6 col-lg-4"><div class="card border-0 shadow-sm h-100"><div class="card-body"><div class="skeleton" style="height:1.2rem;max-width:70%;"></div><div class="skeleton mt-3" style="height:1rem;"></div><div class="skeleton mt-2" style="height:1rem;"></div></div></div></div>
+    </div>
+
+    <hr class="my-4"/>
+
+    <section class="status-legend-panel">
+      <ul class="list-inline mb-0">
+        <li class="list-inline-item"><span class="badge status-charging">Laddar</span></li>
+        <li class="list-inline-item"><span class="badge status-available">Ledig</span></li>
+        <li class="list-inline-item"><span class="badge status-faulted">Ur drift</span></li>
+        <li class="list-inline-item"><span class="badge status-unavailable">Otillgänglig</span></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="text-center text-muted small py-3"></footer>
+
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/assets/ui-common.js"></script>
+  <script src="/assets/org_index.js?v=4"></script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+services:
+  redis-service:
+    image: redis:7-alpine
+    container_name: redis-service
+    restart: unless-stopped
+    expose:
+      - "6379"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ocpp-ws-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ocpp_ws
+    container_name: ocpp-ws-service
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9000:9000"
+    environment:
+      - REDIS_HOST=redis-service
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - OCPP_PORT=9000
+      - CP_AUTH_REQUIRED=${CP_AUTH_REQUIRED:-false}
+      - CP_SHARED_TOKEN=${CP_SHARED_TOKEN:-}
+      - CP_AUTOMAP_ON_CONNECT=${CP_AUTOMAP_ON_CONNECT:-false}
+      - PORTAL_TAGS_GLOBAL=${PORTAL_TAGS_GLOBAL:-false}
+    volumes:
+      - ./data:/data
+      - ./config:/data/config
+    depends_on:
+      - redis-service
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 9000)); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: api-service
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - REDIS_HOST=redis-service
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - API_PORT=8000
+      - APP_SECRET=${APP_SECRET}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}
+      - MAX_IMPORT_FILE_BYTES=${MAX_IMPORT_FILE_BYTES:-2097152}
+    volumes:
+      - ./data:/data
+      - ./config:/data/config
+    depends_on:
+      - redis-service
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ui-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ui
+    container_name: ui-service
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - api-service
+
+
+  backup-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backup
+    container_name: backup-service
+    restart: unless-stopped
+    environment:
+      - BACKUP_ENABLED=${BACKUP_ENABLED:-false}
+      - BACKUP_GIT_URL=${BACKUP_GIT_URL:-}
+      - BACKUP_GIT_BRANCH=${BACKUP_GIT_BRANCH:-main}
+      - BACKUP_GIT_USER_NAME=${BACKUP_GIT_USER_NAME:-EVCSMS Backup Bot}
+      - BACKUP_GIT_USER_EMAIL=${BACKUP_GIT_USER_EMAIL:-evcsms-backup@example.invalid}
+      - BACKUP_REPO_TARGET_DIR=${BACKUP_REPO_TARGET_DIR:-charge-history}
+      - BACKUP_INTERVAL_SECONDS=${BACKUP_INTERVAL_SECONDS:-172800}
+      - BACKUP_RUN_ON_STARTUP=${BACKUP_RUN_ON_STARTUP:-true}
+      - BACKUP_GIT_SSH_KEY_PATH=${BACKUP_GIT_SSH_KEY_PATH:-/run/secrets/backup_git_ed25519}
+      - BACKUP_GIT_KNOWN_HOSTS_PATH=${BACKUP_GIT_KNOWN_HOSTS_PATH:-/run/secrets/github_known_hosts}
+      - BACKUP_GIT_STRICT_HOST_KEY_CHECKING=${BACKUP_GIT_STRICT_HOST_KEY_CHECKING:-true}
+      - BACKUP_GIT_SSH_COMMAND=${BACKUP_GIT_SSH_COMMAND:-}
+      - BACKUP_DATA_DIR=/data
+      - BACKUP_CONFIG_DIR=/data/config
+      - BACKUP_GIT_WORKTREE=/data/backups/git-worktree
+    volumes:
+      - ./data:/data
+      - ./config:/data/config
+      - ./secrets:/run/secrets:ro
+    depends_on:
+      - api-service
+

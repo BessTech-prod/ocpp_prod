@@ -9,7 +9,8 @@ from pathlib import Path
 
 # This file is for local/demo development only. Not needed in production unless you use the backup service in production.
 
-ROOT = Path(__file__).resolve().parents[1]
+# Set ROOT to the correct production path for besstech-deploy
+ROOT = Path("/home/besstech/ocpp_prod/ocpp_prod/evcsms")
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

@@ -1,0 +1,29 @@
+
+services:
+  evcsms-local:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.single
+    container_name: evcsms-local
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8000:8000"
+      - "9000:9000"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-defaultpassword}
+      - APP_SECRET=${APP_SECRET:-dev-secret-change-me}
+      - PORTAL_TAGS_GLOBAL=${PORTAL_TAGS_GLOBAL:-false}
+    volumes:
+      - ./data:/data
+      - ./config:/data/config
+      - ./web:/app/web
+      - ./app:/app/app
+      - ./api.py:/app/api.py
+      - ./ocpp_ws.py:/app/ocpp_ws.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+

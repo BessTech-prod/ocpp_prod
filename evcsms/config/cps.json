@@ -1,0 +1,22 @@
+{
+  "demo-unassigned-01": {
+    "org_id": "Takorama_Storås",
+    "alias": "Laddare 1 baksida"
+  },
+  "demo-unassigned-02": {
+    "org_id": "Takorama_Storås",
+    "alias": "Laddare 2 baksida"
+  },
+  "demo-unassigned-03": {
+    "org_id": "Takorama_Storås",
+    "alias": "Ctek framsida"
+  },
+  "demo-unassigned-04": {
+    "org_id": "Takorama_Storås",
+    "alias": "Easee Framisda"
+  },
+  "demo-unassigned-05": {
+    "org_id": "Takorama_Storås",
+    "alias": "ChargeAmp framsida"
+  }
+}

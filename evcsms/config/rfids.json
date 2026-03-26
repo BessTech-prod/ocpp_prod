@@ -1,0 +1,170 @@
+{
+  "ADMIN": {
+    "alias": "A1",
+    "org_id": "default",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-21T20:59:48.584842Z"
+  },
+  "4BC5918A": {
+    "alias": "S2",
+    "org_id": "Takorama_Storås",
+    "user_email": "magnus@takorama.se",
+    "active": true,
+    "updated_at": "2026-03-21T20:55:07.880413Z"
+  },
+  "8B3D028A": {
+    "alias": "S1",
+    "org_id": "Takorama_Storås",
+    "user_email": "hugo@takorama.se",
+    "active": true,
+    "updated_at": "2026-03-25T06:21:26.303821Z"
+  },
+  "12345687": {
+    "alias": "2",
+    "org_id": "kaefer_std",
+    "user_email": "user@takorama.se",
+    "active": true,
+    "updated_at": "2026-03-21T20:56:39.450125Z"
+  },
+  "C8D00B9F": {
+    "alias": "S3",
+    "org_id": "Takorama_Storås",
+    "user_email": "orgadmin@takorama.se",
+    "active": true,
+    "updated_at": "2026-03-24T17:24:26.204847Z"
+  },
+  "66666666": {
+    "alias": "2",
+    "org_id": "default",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-21T20:55:46.788687Z"
+  },
+  "3333333": {
+    "alias": "4",
+    "org_id": "kaefer_std",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-21T20:56:23.073902Z"
+  },
+  "222222": {
+    "alias": "3",
+    "org_id": "kaefer_std",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-21T20:56:14.320090Z"
+  },
+  "E3884WAS": {
+    "alias": "test1",
+    "org_id": "Takorama_Storås",
+    "user_email": "linn@dahlstrom.se",
+    "active": true,
+    "updated_at": "2026-03-24T17:24:39.144265Z"
+  },
+  "34JJH3UH3": {
+    "alias": "test2",
+    "org_id": "Takorama_Storås",
+    "user_email": "rutstina95@gmail.com",
+    "active": true,
+    "updated_at": "2026-03-22T09:33:37.614690Z"
+  },
+  "UNSET-E7BFFBBB": {
+    "alias": "1",
+    "org_id": "Takorama_Storås",
+    "user_email": "erik@example.com",
+    "active": true,
+    "updated_at": "2026-03-21T22:17:39.821925Z"
+  },
+  "E364657HJSH": {
+    "alias": "s4",
+    "org_id": "Takorama_Storås",
+    "user_email": "anna@example.com",
+    "active": true,
+    "updated_at": "2026-03-21T22:17:49.471349Z"
+  },
+  "8Y2OJPDQIHH2": {
+    "alias": "S5",
+    "org_id": "default",
+    "user_email": "admin@takorama.se",
+    "active": true,
+    "updated_at": "2026-03-21T20:59:48.584806Z"
+  },
+  "UNSET-BC0C2AD3": {
+    "alias": "UNSET-BC0C2AD3",
+    "org_id": "Takorama_Storås",
+    "user_email": "sodia.mereus@gmail.com",
+    "active": true,
+    "updated_at": "2026-03-22T09:37:05.433616Z"
+  },
+  "UNSET-3E78C7D9": {
+    "alias": "UNSET-3E78C7D9",
+    "org_id": "Takorama_Storås",
+    "user_email": "fredrik.melander@takorama.se",
+    "active": true,
+    "updated_at": "2026-03-22T09:37:05.433663Z"
+  },
+  "5BB6EA8A": {
+    "alias": "1",
+    "org_id": "Takorama_Storås",
+    "user_email": "mustach@mycket.se",
+    "active": true,
+    "updated_at": "2026-03-26T08:35:21.762069Z"
+  },
+  "3BFDE18A": {
+    "alias": "2",
+    "org_id": "Takorama_Storås",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-22T17:57:43.060074Z"
+  },
+  "3BFD718A": {
+    "alias": "3",
+    "org_id": "Takorama_Storås",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-22T17:57:43.060091Z"
+  },
+  "3B83EF8A": {
+    "alias": "4",
+    "org_id": "Takorama_Storås",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-22T17:57:43.060099Z"
+  },
+  "F826879F": {
+    "alias": "5",
+    "org_id": "Takorama_Storås",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-22T17:57:43.060106Z"
+  },
+  "8B765C8A": {
+    "alias": "6",
+    "org_id": "Takorama_Storås",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-22T17:57:43.060112Z"
+  },
+  "3BE7228A": {
+    "alias": "7",
+    "org_id": "Takorama_Storås",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-22T17:57:43.060118Z"
+  },
+  "7BA28F8A": {
+    "alias": "9",
+    "org_id": "Takorama_Storås",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-22T17:57:43.060134Z"
+  },
+  "3BFC7C8A": {
+    "alias": "10",
+    "org_id": "Takorama_Storås",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-03-26T08:35:04.429633Z"
+  }
+}

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <title>TakoramaCharge – Användare</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
+    <div class="container-fluid">
+      <a href="javascript:void(0)" class="navbar-brand d-flex align-items-center js-go-dashboard">
+        <img src="/assets/logo_trans_vit.png" srcset="/assets/logo_trans_vit.png 2x" class="brand-logo" alt="TakoramaCharge">
+        <span class="brand-text ms-2">Skapa användare</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain"><span class="navbar-toggler-icon"></span></button>
+      <div id="navMain" class="collapse navbar-collapse justify-content-end">
+        <ul class="navbar-nav align-items-center gap-2">
+          <li class="nav-item"><a href="javascript:void(0)" class="nav-link js-go-dashboard"><i class="bi bi-speedometer2"></i> Överblick</a></li>
+          <li class="nav-item"><a class="nav-link" href="/portal/live_ops.html"><i class="bi bi-broadcast-pin"></i> Live driftpanel</a></li>
+          <li class="nav-item"><a class="nav-link" href="/portal/cps.html"><i class="bi bi-diagram-3"></i> Laddare</a></li>
+          <li class="nav-item"><a class="nav-link" href="/portal/rfid.html"><i class="bi bi-upc-scan"></i> RFID</a></li>
+          <li class="nav-item"><a class="nav-link" data-route-portal="/portal/add_user.html" data-route-org="/org/add_user.html" data-route-user="/user/index.html"><i class="bi bi-person-plus"></i> Användare</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin"><a class="nav-link" href="/orgs.html"><i class="bi bi-building-gear"></i> Organisationer</a></li>
+          <li class="nav-item"><a class="nav-link" data-route-portal="/users_history.html" data-route-org="/org/history.html" data-route-user="/user/index.html"><i class="bi bi-clock-history"></i> Historik</a></li>
+          <li class="nav-item"><a class="nav-link" data-route-portal="/my.html" data-route-org="/org/my.html" data-route-user="/user/my.html"><i class="bi bi-person-badge"></i> Min statistik</a></li>
+
+          <li class="nav-item"><span id="me-display" class="navbar-text small text-light opacity-75"></span></li>
+          <li class="nav-item"><button id="btnLogout" class="btn btn-outline-light btn-sm" type="button"><i class="bi bi-box-arrow-right"></i> Logga ut</button></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container my-4 app-shell">
+    <div id="page-alerts"></div>
+    <div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+    <section class="content-panel mb-4">
+      <div class="page-header mb-4">
+        <div>
+          <h1 class="h4 m-0">Administrera användare</h1>
+          <p class="page-subtitle">Skapa nya eller redigera befintliga användare.</p>
+        </div>
+      </div>
+      <form id="add-user-form" class="needs-validation" novalidate>
+        <input type="hidden" id="editingTag" value="">
+        <div class="row g-3">
+          <div class="col-12 col-md-3">
+            <label for="firstName" class="form-label">Förnamn</label>
+            <input id="firstName" type="text" class="form-control" required>
+            <div class="invalid-feedback">Ange förnamn.</div>
+          </div>
+          <div class="col-12 col-md-3">
+            <label for="lastName" class="form-label">Efternamn</label>
+            <input id="lastName" type="text" class="form-control" required>
+            <div class="invalid-feedback">Ange efternamn.</div>
+          </div>
+          <div class="col-12 col-md-3">
+            <label for="rfidTag" class="form-label">RFID‑tagg</label>
+            <select id="rfidTagSelect" class="form-select" required>
+              <option value="">— Välj RFID —</option>
+            </select>
+            <div class="form-text">Välj en befintlig tagg eller välj "Ny tagg...".</div>
+            <input id="rfidTag" type="text" class="form-control mt-2" placeholder="Ny RFID-tagg" disabled>
+            <div class="invalid-feedback">Välj eller ange RFID.</div>
+          </div>
+          <div class="col-12 col-md-3">
+            <label for="role" class="form-label">Roll</label>
+            <select id="role" class="form-select">
+              <option value="user" selected>Användare</option>
+              <option value="org_admin">Organisations‑admin</option>
+              <option value="portal_admin">Portal‑admin</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <label for="email" class="form-label">E‑post (login)</label>
+            <input id="email" type="email" class="form-control" placeholder="namn@domän.se" required>
+            <div class="invalid-feedback">Ange en giltig e‑post.</div>
+          </div>
+          <div class="col-12 col-md-4">
+            <label for="password" class="form-label">Lösenord</label>
+            <input id="password" type="password" class="form-control" placeholder="Minst 6 tecken">
+            <div class="form-text"></div>
+          </div>
+          <div class="col-12 col-md-4">
+            <label for="orgSelect" class="form-label">Organisation</label>
+            <select id="orgSelect" class="form-select"></select>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+          <a href="javascript:void(0)" class="btn btn-outline-secondary js-go-dashboard back-link">← Tillbaka till överblick</a>
+          <button class="btn btn-primary btn-icon" type="submit" id="btnSaveUser"><i class="bi bi-save"></i> <span id="btnSaveLabel">Spara</span></button>
+          <button class="btn btn-outline-secondary btn-icon d-none" type="button" id="btnCancel">
+            <i class="bi bi-x-circle"></i> <span>Avbryt</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <hr class="my-4"/>
+    <section class="content-panel mb-4">
+      <h2 class="h5 mb-3">Aktiva användare</h2>
+      <div class="d-flex justify-content-between align-items-center mb-2 toolbar-panel">
+        <div class="input-group input-group-sm" style="max-width: 260px;">
+          <span class="input-group-text">Sök</span>
+          <input id="filterInput" type="text" class="form-control" placeholder="Namn eller RFID...">
+        </div>
+        <div class="input-group input-group-sm" style="max-width: 280px;">
+          <span class="input-group-text">Org</span>
+          <select id="orgFilter" class="form-select">
+            <option value="">Alla organisationer</option>
+          </select>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" id="btnRefreshList" type="button">Uppdatera lista</button>
+      </div>
+
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <span class="small text-muted" id="usersListSummary"></span>
+        <button class="btn btn-sm btn-outline-secondary d-none" id="btnToggleUsersList" type="button"></button>
+      </div>
+
+      <div class="table-responsive shadow-sm table-panel">
+        <table class="table table-sm table-striped align-middle" id="users-table">
+          <thead class="table-dark">
+            <tr><th>Namn</th><th>RFID</th><th>Org</th><th class="text-end" style="width:260px;">Åtgärder</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr class="my-4"/>
+    <section class="content-panel mb-4">
+      <h2 class="h5 mb-3">Inaktiva användare <span class="badge text-bg-secondary ms-1" id="unassignedCount"></span></h2>
+      <p class="page-subtitle text-muted small mb-3">Användare utan tilldelad RFID-tagg.</p>
+
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <span class="small text-muted" id="unassignedListSummary"></span>
+        <button class="btn btn-sm btn-outline-secondary d-none" id="btnToggleUnassignedList" type="button"></button>
+      </div>
+
+      <div class="table-responsive shadow-sm table-panel">
+        <table class="table table-sm table-striped align-middle" id="unassigned-table">
+          <thead class="table-dark">
+            <tr><th>Namn</th><th>E-post</th><th>Org</th><th class="text-end" style="width:200px;">Åtgärder</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr class="my-4"/>
+    <section class="content-panel mb-4">
+      <h2 class="h5 mb-3">Massimport via XLSX</h2>
+      <p class="page-subtitle text-muted small mb-3">Ladda ner mall, fyll i användare och importera flera rader samtidigt.</p>
+
+      <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+        <button class="btn btn-sm btn-outline-secondary" id="btnDownloadUserTemplate" type="button">
+          <i class="bi bi-download"></i> Ladda ner XLSX-mall
+        </button>
+        <div class="form-check ms-2">
+          <input class="form-check-input" type="checkbox" id="csvImportDryRun" checked>
+          <label class="form-check-label" for="csvImportDryRun">Testkör (ingen sparning)</label>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-12 col-md-8">
+          <input id="csvImportFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="form-control">
+        </div>
+        <div class="col-12 col-md-4 d-grid">
+          <button class="btn btn-primary" id="btnImportUsersCsv" type="button"><i class="bi bi-upload"></i> Importera XLSX</button>
+        </div>
+      </div>
+
+      <div id="csvImportSummary" class="small text-muted mb-2"></div>
+      <div class="table-panel" style="padding:0; overflow:hidden;">
+        <div class="import-result-header" style="grid-template-columns:60px 80px 1fr;">
+          <span>Rad</span>
+          <span>Status</span>
+          <span>Meddelande</span>
+        </div>
+        <table class="table table-sm table-striped align-middle mb-0" style="width:100%; table-layout:fixed;" id="csvImportTable">
+          <colgroup>
+            <col style="width:60px;">
+            <col style="width:80px;">
+            <col>
+          </colgroup>
+          <tbody id="csvImportResults"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="text-center text-muted small py-3"></footer>
+
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/assets/ui-common.js"></script>
+  <script src="/assets/portal_add_user.js?v=11"></script>
+</body>
+</html>
