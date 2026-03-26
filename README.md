@@ -1,2 +1,0 @@
-# ocpp_prod
-ocppprod
