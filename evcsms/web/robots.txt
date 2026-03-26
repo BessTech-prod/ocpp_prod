@@ -1,0 +1,23 @@
+# robots.txt — EV CSMS portal
+# This is a private management portal. No content is intended for public indexing.
+#
+# NOTE: robots.txt is a CRAWLING instruction only — it does not restrict access.
+# Real access control is enforced by authentication on all API and portal routes.
+
+User-agent: *
+Disallow: /
+
+# Explicitly block known sensitive paths in case partial crawlers ignore the rule above.
+Disallow: /api/
+Disallow: /docs
+Disallow: /redoc
+Disallow: /openapi.json
+Disallow: /login.html
+Disallow: /portal/
+Disallow: /org/
+Disallow: /user/
+Disallow: /my.html
+Disallow: /users.html
+Disallow: /orgs.html
+Disallow: /users_history.html
+

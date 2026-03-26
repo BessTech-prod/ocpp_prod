@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <title>TakoramaCharge – RFID</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
+    <div class="container-fluid">
+      <a href="javascript:void(0)" class="navbar-brand d-flex align-items-center js-go-dashboard">
+        <img src="/assets/logo_trans_vit.png" srcset="/assets/logo_trans_vit.png 2x" class="brand-logo" alt="TakoramaCharge">
+        <span class="brand-text ms-2">RFID</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain"><span class="navbar-toggler-icon"></span></button>
+      <div id="navMain" class="collapse navbar-collapse justify-content-end">
+        <ul class="navbar-nav align-items-center gap-2">
+          <li class="nav-item"><a href="javascript:void(0)" class="nav-link js-go-dashboard"><i class="bi bi-speedometer2"></i> Överblick</a></li>
+          <li class="nav-item"><a class="nav-link" href="/org/rfid.html"><i class="bi bi-upc-scan"></i> RFID</a></li>
+          <li class="nav-item"><a class="nav-link" data-route-portal="/portal/add_user.html" data-route-org="/org/add_user.html" data-route-user="/user/index.html"><i class="bi bi-person-plus"></i> Användare</a></li>
+          <li class="nav-item"><a class="nav-link" data-route-portal="/users_history.html" data-route-org="/org/history.html" data-route-user="/user/index.html"><i class="bi bi-clock-history"></i> Historik</a></li>
+          <li class="nav-item"><a class="nav-link" data-route-portal="/my.html" data-route-org="/org/my.html" data-route-user="/user/my.html"><i class="bi bi-person-badge"></i> Min statistik</a></li>
+          <li class="nav-item"><span id="me-display" class="navbar-text small text-light opacity-75"></span></li>
+          <li class="nav-item"><button id="btnLogout" class="btn btn-outline-light btn-sm" type="button"><i class="bi bi-box-arrow-right"></i> Logga ut</button></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container my-4 app-shell">
+    <div id="page-alerts"></div>
+    <div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+    <section class="content-panel mb-4">
+      <div class="page-header mb-3">
+        <div>
+          <h1 class="h4 m-0">RFID i organisationen</h1>
+          <p class="page-subtitle">Lägg till, tilldela och hantera taggar inom din organisation.</p>
+        </div>
+      </div>
+
+      <form id="rfid-form" class="row g-3 needs-validation" novalidate>
+        <div class="col-12 col-md-4">
+          <label for="rfidTag" class="form-label">RFID-kod</label>
+          <input id="rfidTag" type="text" class="form-control" required>
+        </div>
+        <div class="col-12 col-md-4">
+          <label for="rfidAlias" class="form-label">Alias</label>
+          <input id="rfidAlias" type="text" class="form-control" placeholder="Ex: S1">
+        </div>
+        <div class="col-12 col-md-4">
+          <label for="rfidUser" class="form-label">Tilldela användare</label>
+          <select id="rfidUser" class="form-select"></select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label for="rfidActive" class="form-label">Status</label>
+          <select id="rfidActive" class="form-select">
+            <option value="true">Aktiv</option>
+            <option value="false">Inaktiv</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-8 d-flex align-items-end gap-2">
+          <button class="btn btn-primary" id="btnSaveRfid" type="submit"><i class="bi bi-save"></i> <span id="rfidSubmitLabel">Skapa RFID</span></button>
+          <button class="btn btn-outline-secondary d-none" id="btnCancelEdit" type="button">Avbryt</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="content-panel mb-4">
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <div class="input-group input-group-sm" style="max-width: 360px;">
+          <span class="input-group-text">Sök</span>
+          <input id="rfidFilter" class="form-control" placeholder="Alias, tagg eller e-post">
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" id="btnRefreshRfid" type="button"><i class="bi bi-arrow-clockwise"></i> Uppdatera</button>
+      </div>
+
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <span id="rfidListSummary" class="small text-muted"></span>
+        <button class="btn btn-sm btn-outline-secondary d-none" id="btnToggleRfidList" type="button"></button>
+      </div>
+
+      <div class="table-responsive shadow-sm table-panel">
+        <table class="table table-sm table-striped align-middle" id="rfid-table">
+          <thead class="table-dark">
+            <tr><th>Alias</th><th>RFID</th><th>Användare</th><th>Status</th><th class="text-end" style="width:300px;">Åtgärder</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="content-panel mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h2 class="h5 mb-0">RFID-logg</h2>
+        <div class="d-flex align-items-center gap-3">
+          <span id="rfidAuditSummary" class="small text-muted"></span>
+          <button class="btn btn-sm btn-outline-secondary d-none" id="btnToggleRfidAudit" type="button"></button>
+        </div>
+      </div>
+      <div class="table-responsive shadow-sm table-panel">
+        <table class="table table-sm table-striped align-middle" id="rfid-audit-table">
+          <thead class="table-dark">
+            <tr><th>Tid</th><th>Aktör</th><th>Händelse</th><th>Tagg</th><th>Detaljer</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="content-panel">
+      <h2 class="h5 mb-3">Massimport av RFID-taggar via XLSX</h2>
+      <p class="page-subtitle text-muted small mb-3">Ladda ner mall, fyll i taggar och importera flera på en gång. Organisationen sätts automatiskt till din organisation.</p>
+
+      <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+        <button class="btn btn-sm btn-outline-secondary" id="btnDownloadRfidTemplate" type="button">
+          <i class="bi bi-download"></i> Ladda ner XLSX-mall
+        </button>
+        <div class="form-check ms-2">
+          <input class="form-check-input" type="checkbox" id="rfidImportDryRun" checked>
+          <label class="form-check-label" for="rfidImportDryRun">Testkör (ingen sparning)</label>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-12 col-md-8">
+          <input id="rfidImportFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="form-control">
+        </div>
+        <div class="col-12 col-md-4 d-grid">
+          <button class="btn btn-primary" id="btnImportRfids" type="button"><i class="bi bi-upload"></i> Importera XLSX</button>
+        </div>
+      </div>
+
+      <div id="rfidImportSummary" class="small text-muted mb-2"></div>
+      <div class="table-panel" style="padding:0; overflow:hidden;">
+        <div class="import-result-header" style="grid-template-columns:60px 80px 1fr;">
+          <span>Rad</span>
+          <span>Status</span>
+          <span>Meddelande</span>
+        </div>
+        <table class="table table-sm table-striped align-middle mb-0" style="width:100%; table-layout:fixed;">
+          <colgroup>
+            <col style="width:60px;">
+            <col style="width:80px;">
+            <col>
+          </colgroup>
+          <tbody id="rfidImportResults"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/assets/ui-common.js"></script>
+  <script src="/assets/rfid_manager.js?v=7"></script>
+</body>
+</html>
+
