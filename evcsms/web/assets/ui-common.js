@@ -29,7 +29,7 @@
   /* ------------------------------- HTTP ------------------------------------ */
   async function handle401(r) {
     if (r.status === 401) {
-      window.location.href = "/login.html";
+      window.location.href = "/login";
       throw new Error("401 (redirect to login)");
     }
   }
@@ -121,9 +121,9 @@
     try{
       const me = await whoAmI();
       const role=(me.role||"").toLowerCase();
-      if (role==="portal_admin" || role==="admin") window.location.href="/portal/index.html";
-      else if (role==="org_admin")                 window.location.href="/org/index.html";
-      else                                         window.location.href="/user/index.html";
+      if (role==="portal_admin" || role==="admin") window.location.href="/portal/index";
+      else if (role==="org_admin")                 window.location.href="/org/index";
+      else                                         window.location.href="/user/index";
     }catch{ window.location.href="/login.html"; }
   };
   UI.requireRole = async function requireRole(allowedRoles){
@@ -131,9 +131,9 @@
     const role=(me.role||"").toLowerCase();
     const allowed=(allowedRoles||["user","org_admin","portal_admin","admin"]).map(s=>s.toLowerCase());
     if (!allowed.includes(role)){
-      if (role==="portal_admin" || role==="admin") window.location.href="/portal/index.html";
-      else if (role==="org_admin")                 window.location.href="/org/index.html";
-      else                                         window.location.href="/user/index.html";
+      if (role==="portal_admin" || role==="admin") window.location.href="/portal/index";
+      else if (role==="org_admin")                 window.location.href="/org/index";
+      else                                         window.location.href="/user/index";
       return null;
     }
     return me;
@@ -151,7 +151,7 @@
     if (btnOut){
       btnOut.addEventListener("click", async ()=>{
         try{ await fetch("/api/auth/logout",{method:"POST"}); }catch{}
-        window.location.href="/login.html";
+        window.location.href="/login";
       });
     }
     document.querySelectorAll("#navDashboard, .js-go-dashboard").forEach(el=>{
@@ -176,7 +176,7 @@
       a.removeAttribute("aria-current");
     });
 
-    if (/\/(portal|org|user)\/index\.html$/i.test(current)) {
+    if (/\/(portal|org|user)\/index$/i.test(current)) {
       document.querySelectorAll(".navbar .nav-link.js-go-dashboard, .navbar .nav-link#navDashboard").forEach(a=>{
         a.classList.add("active");
         a.setAttribute("aria-current", "page");

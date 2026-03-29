@@ -19,7 +19,7 @@
       <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>`);
     new bootstrap.Toast(document.getElementById(id),{delay:2200}).show();
   }
-  async function getJSON(url){ const r=await fetch(url,{cache:'no-store'}); if(!r.ok){ if(r.status===401){ window.location.href='/login.html'; } throw new Error(`${url} -> ${r.status}`);} return r.json(); }
+  async function getJSON(url){ const r=await fetch(url,{cache:'no-store'}); if(!r.ok){ if(r.status===401){ window.location.href='/login'; } throw new Error(`${url} -> ${r.status}`);} return r.json(); }
   async function postJSON(url, body){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); if(!r.ok){ throw new Error(`${url} -> ${r.status} ${await r.text().catch(()=> '')}`);} return r.json(); }
   async function del(url){ const r=await fetch(url,{method:'DELETE'}); if(!r.ok){ throw new Error(`${url} -> ${r.status} ${await r.text().catch(()=> '')}`);} return r.json(); }
 

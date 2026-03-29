@@ -11,15 +11,15 @@
     try{
       const me = await getMe();
       const role = (me.role || '').toLowerCase();
-      if (role === 'portal_admin' || role === 'admin') {
-        window.location.href = '/portal/index.html';
-      } else if (role === 'org_admin') {
-        window.location.href = '/org/index.html';
-      } else {
-        window.location.href = '/user/index.html';
-      }
+       if (role === 'portal_admin' || role === 'admin') {
+         window.location.href = '/portal/index';
+       } else if (role === 'org_admin') {
+         window.location.href = '/org/index';
+       } else {
+         window.location.href = '/user/index';
+       }
     }catch{
-      window.location.href = '/login.html';
+      window.location.href = '/login';
     }
   }
 
