@@ -32,6 +32,11 @@ Common error codes:
 
 ---
 
+## IP Whitelisting
+Administrators can optionally restrict API keys to specific IP addresses. If a whitelist is configured, requests from non-authorized IPs will return a `401 Unauthorized` response.
+
+---
+
 ## Endpoints
 
 ### 1. Get Chargers (`GET /api/v1/chargers`)

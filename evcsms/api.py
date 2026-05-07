@@ -406,6 +406,7 @@ class CpAssignBody(BaseModel):
 class ApiKeyGenerateBody(BaseModel):
     org_id: str
     rate_limit: int = 120
+    ip_whitelist: Optional[List[str]] = None
 
 class ApiKeyRevokeBody(BaseModel):
     org_id: str
@@ -415,6 +416,11 @@ class ApiKeyStatusBody(BaseModel):
     org_id: str
     key_hash: str
     active: bool
+
+class ApiKeyWhitelistBody(BaseModel):
+    org_id: str
+    key_hash: str
+    ip_whitelist: List[str]
 
 class OcppCommandBody(BaseModel):
     cp_id: str
@@ -956,11 +962,12 @@ async def admin_generate_api_key(body: ApiKeyGenerateBody, session=Depends(requi
     """Generate a new API key for an organization."""
     org_id = body.org_id
     rate_limit = body.rate_limit
+    ip_whitelist = body.ip_whitelist
     orgs = load_orgs()
     if org_id not in orgs:
         raise HTTPException(400, "Ogiltig organisation")
     
-    raw_key, key_hash = api_key_manager.generate_key_for_org(org_id, rate_limit)
+    raw_key, key_hash = api_key_manager.generate_key_for_org(org_id, rate_limit, ip_whitelist)
     return {"ok": True, "raw_key": raw_key, "key_hash": key_hash}
 
 @app.post("/api/admin/external/keys/revoke")
@@ -979,6 +986,14 @@ async def admin_set_api_key_status(body: ApiKeyStatusBody, session=Depends(requi
     success = api_key_manager.set_key_active_status(body.org_id, body.key_hash, body.active)
     if not success:
         raise HTTPException(400, "Kunde inte uppdatera nyckelns status")
+    return {"ok": True}
+
+@app.post("/api/admin/external/keys/whitelist")
+async def admin_set_api_key_whitelist(body: ApiKeyWhitelistBody, session=Depends(require_portal_admin)):
+    """Update the IP whitelist for an API key."""
+    success = api_key_manager.update_key_whitelist(body.org_id, body.key_hash, body.ip_whitelist)
+    if not success:
+        raise HTTPException(400, "Kunde inte uppdatera IP-vitlistan")
     return {"ok": True}
 
 @app.get("/api/status")
@@ -1791,17 +1806,23 @@ def validate_external_api_key(request: Request, api_key: str = Query(..., min_le
     Dependency: Validate external API key and return org_id.
     Raises 401 if invalid, 429 if rate limited.
     """
-    # OPTION 1: Use Redis for last_used tracking instead of disk
-    result = api_key_manager.validate_key(api_key, update_last_used=False)
+    client_ip = request.client.host if request.client else None
+    
+    # Check if we are behind a proxy (like Nginx)
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        client_ip = forwarded_for.split(",")[0].strip()
+
+    result = api_key_manager.validate_key(api_key, client_ip=client_ip, update_last_used=False)
     
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
     endpoint = request.url.path
     
     if not result:
-        log_external_call("unknown", endpoint, 401, "Invalid API Key", key_hash)
+        log_external_call("unknown", endpoint, 401, f"Invalid API Key or IP ({client_ip})", key_hash)
         raise HTTPException(401, json.dumps({
             "error": "invalid_api_key",
-            "message": "The provided API key is not valid",
+            "message": "The provided API key is not valid or IP is not authorized",
             "code": 401
         }), headers={"Content-Type": "application/json"})
     

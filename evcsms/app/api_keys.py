@@ -55,7 +55,7 @@ class ApiKeyManager:
         """Hash API key using SHA256."""
         return hashlib.sha256(raw_key.encode()).hexdigest()
     
-    def generate_key_for_org(self, org_id: str, rate_limit: int = 120) -> Tuple[str, str]:
+    def generate_key_for_org(self, org_id: str, rate_limit: int = 120, ip_whitelist: list = None) -> Tuple[str, str]:
         """
         Generate a new API key for an organization.
         
@@ -70,6 +70,7 @@ class ApiKeyManager:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "last_used": None,
             "rate_limit": rate_limit,
+            "ip_whitelist": ip_whitelist or [],
             "active": True
         }
         
@@ -78,7 +79,7 @@ class ApiKeyManager:
         
         return raw_key, key_hash
     
-    def validate_key(self, raw_key: str, update_last_used: bool = False) -> Optional[Dict]:
+    def validate_key(self, raw_key: str, client_ip: Optional[str] = None, update_last_used: bool = False) -> Optional[Dict]:
         """
         Validate an API key and return metadata if valid.
         
@@ -95,6 +96,13 @@ class ApiKeyManager:
         
         if not entry.get("active", False):
             return None  # Key is disabled
+
+        # Check IP Whitelist if configured
+        whitelist = entry.get("ip_whitelist", [])
+        if whitelist and client_ip:
+            if client_ip not in whitelist:
+                # Security note: We could log this attempt
+                return None
         
         if update_last_used:
             # Update last_used on disk (traditional way)
@@ -111,6 +119,16 @@ class ApiKeyManager:
             return False
         
         entry["active"] = active
+        self._save()
+        return True
+
+    def update_key_whitelist(self, org_id: str, key_hash: str, ip_whitelist: list) -> bool:
+        """Update the IP whitelist for an API key."""
+        entry = self._keys.get(key_hash)
+        if not entry or entry.get("org_id") != org_id:
+            return False
+        
+        entry["ip_whitelist"] = ip_whitelist
         self._save()
         return True
 
@@ -144,6 +162,7 @@ class ApiKeyManager:
                 "created_at": entry.get("created_at"),
                 "last_used": entry.get("last_used"),
                 "rate_limit": entry.get("rate_limit", 120),
+                "ip_whitelist": entry.get("ip_whitelist", []),
                 "active": entry.get("active", False)
             }
             for key_hash, entry in self._keys.items()
@@ -160,6 +179,7 @@ class ApiKeyManager:
                 "created_at": entry.get("created_at"),
                 "last_used": entry.get("last_used"),
                 "rate_limit": entry.get("rate_limit", 120),
+                "ip_whitelist": entry.get("ip_whitelist", []),
                 "active": entry.get("active", False)
             }
             for key_hash, entry in self._keys.items()

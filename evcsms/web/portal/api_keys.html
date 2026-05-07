@@ -86,7 +86,11 @@
             <label for="rateLimit" class="form-label mb-1">Rate Limit (req/h)</label>
             <input type="number" id="rateLimit" class="form-control" value="120" min="1" max="10000">
           </div>
-          <div class="col-12 col-md-4 d-grid">
+          <div class="col-12 col-md-4">
+            <label for="ipWhitelist" class="form-label mb-1">IP-vitlista (valfritt, kommaseparerad)</label>
+            <input type="text" id="ipWhitelist" class="form-control" placeholder="t.ex. 1.2.3.4">
+          </div>
+          <div class="col-12 col-md-12 d-grid mt-3">
             <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Skapa nyckel</button>
           </div>
         </form>
@@ -156,7 +160,21 @@
 
             <dt class="col-sm-5">Status:</dt>
             <dd class="col-sm-7" id="specStatus">-</dd>
+
+            <dt class="col-sm-5">IP-vitlista:</dt>
+            <dd class="col-sm-7" id="specWhitelist">-</dd>
           </dl>
+          <hr>
+          <div class="mb-3">
+            <label class="form-label small fw-bold">Hantera IP-vitlista:</label>
+            <div class="input-group input-group-sm">
+              <input type="text" id="newIpInput" class="form-control" placeholder="Lägg till IP-adress...">
+              <button class="btn btn-primary" type="button" id="btnAddIp"><i class="bi bi-plus"></i></button>
+            </div>
+            <div id="whitelistBadges" class="mt-2 d-flex flex-wrap gap-1">
+              <!-- Badges will be added here -->
+            </div>
+          </div>
           <hr>
           <div class="mb-3">
             <label class="form-label small fw-bold">API-URL (Laddare):</label>

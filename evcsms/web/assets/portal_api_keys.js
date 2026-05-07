@@ -29,6 +29,11 @@
     btnCopyUrlChargers: document.getElementById("btnCopyUrlChargers"),
     urlEnergy: document.getElementById("urlEnergy"),
     btnCopyUrlEnergy: document.getElementById("btnCopyUrlEnergy"),
+    ipWhitelist: document.getElementById("ipWhitelist"),
+    specWhitelist: document.getElementById("specWhitelist"),
+    newIpInput: document.getElementById("newIpInput"),
+    btnAddIp: document.getElementById("btnAddIp"),
+    whitelistBadges: document.getElementById("whitelistBadges"),
   };
 
   let pendingRevoke = null;
@@ -107,6 +112,8 @@
     elements.specStatus.innerHTML = k.active 
       ? '<span class="badge bg-success">Aktiv</span>' 
       : '<span class="badge bg-secondary">Pausad</span>';
+    
+    renderWhitelist(k.ip_whitelist || []);
 
     // Populate URLs
     const base = window.location.origin;
@@ -126,6 +133,74 @@
 
     elements.reviewModal.show();
   }
+
+  function renderWhitelist(list) {
+    elements.specWhitelist.textContent = list.length > 0 ? list.join(", ") : "Ingen begränsning (öppen)";
+    elements.whitelistBadges.innerHTML = list.map((ip, idx) => `
+      <span class="badge bg-info text-dark d-flex align-items-center gap-2">
+        ${UI.esc(ip)}
+        <i class="bi bi-x-circle-fill cursor-pointer" onclick="window.removeIpFromWhitelist(${idx})"></i>
+      </span>
+    `).join("");
+    
+    if (list.length === 0) {
+        elements.whitelistBadges.innerHTML = '<span class="text-muted small">Inga IP-adresser tillagda.</span>';
+    }
+  }
+
+  window.removeIpFromWhitelist = async function(idx) {
+    const k = activeKeys.find(x => x.hash === currentReviewHash);
+    if (!k) return;
+    
+    const newList = [...(k.ip_whitelist || [])];
+    newList.splice(idx, 1);
+    
+    try {
+      const res = await UI.postJSON("/api/admin/external/keys/whitelist", {
+        org_id: k.org_id,
+        key_hash: k.hash,
+        ip_whitelist: newList
+      });
+      if (res.ok) {
+        k.ip_whitelist = newList;
+        renderWhitelist(newList);
+        UI.toast("IP-vitlista uppdaterad");
+      }
+    } catch (err) {
+      UI.alert("Kunde inte uppdatera vitlista: " + err.message);
+    }
+  };
+
+  elements.btnAddIp.addEventListener("click", async () => {
+    const ip = elements.newIpInput.value.trim();
+    if (!ip) return;
+    
+    const k = activeKeys.find(x => x.hash === currentReviewHash);
+    if (!k) return;
+    
+    const newList = [...(k.ip_whitelist || [])];
+    if (newList.includes(ip)) {
+        UI.alert("IP-adressen finns redan i listan.");
+        return;
+    }
+    newList.push(ip);
+    
+    try {
+      const res = await UI.postJSON("/api/admin/external/keys/whitelist", {
+        org_id: k.org_id,
+        key_hash: k.hash,
+        ip_whitelist: newList
+      });
+      if (res.ok) {
+        k.ip_whitelist = newList;
+        renderWhitelist(newList);
+        elements.newIpInput.value = "";
+        UI.toast("IP tillagd i vitlistan");
+      }
+    } catch (err) {
+      UI.alert("Kunde inte lägga till IP: " + err.message);
+    }
+  });
 
   async function setKeyStatus(active) {
     const k = activeKeys.find(x => x.hash === currentReviewHash);
@@ -164,9 +239,15 @@
     e.preventDefault();
     const org_id = elements.orgPick.value;
     const rate_limit = parseInt(elements.rateLimit.value);
+    const ip_raw = elements.ipWhitelist.value.trim();
+    const ip_whitelist = ip_raw ? ip_raw.split(",").map(x => x.trim()).filter(x => x) : null;
 
     try {
-      const res = await UI.postJSON("/api/admin/external/keys/generate", { org_id, rate_limit });
+      const res = await UI.postJSON("/api/admin/external/keys/generate", { 
+        org_id, 
+        rate_limit,
+        ip_whitelist
+      });
       if (res.ok) {
         elements.rawKeyDisplay.value = res.raw_key;
         elements.newKeyAlert.classList.remove("d-none");
