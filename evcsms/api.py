@@ -21,6 +21,7 @@ from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel
 
 from app.auth_store import AuthStore
+from app.api_keys import ApiKeyManager
 from app.redis_config import build_redis_client
 
 # =====================================================================
@@ -43,7 +44,7 @@ SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "true").lower() in ("
 MAX_IMPORT_FILE_BYTES = int(os.getenv("MAX_IMPORT_FILE_BYTES", "2097152"))
 
 # File paths
-BASE = Path("/data")
+BASE = Path(os.getenv("BASE_DIR", "/data"))
 TRANSACTIONS_FILE = BASE / "transactions.json"
 AUTH_FILE = BASE / "config" / "auth_tags.json"
 USERS_FILE = BASE / "config" / "users.json"
@@ -51,12 +52,34 @@ ORGS_FILE = BASE / "config" / "orgs.json"
 CPS_FILE = BASE / "config" / "cps.json"
 RFIDS_FILE = BASE / "config" / "rfids.json"
 RFID_AUDIT_FILE = BASE / "rfid_audit.json"
+API_KEYS_FILE = BASE / "config" / "api_keys.json"
+EXTERNAL_API_AUDIT_LOG = BASE / "external_api_audit.log"
 
 # =====================================================================
-# REDIS CLIENT
+# AUDIT LOGGING FOR EXTERNAL API
+# =====================================================================
+external_logger = logging.getLogger("external_api")
+external_logger.setLevel(logging.INFO)
+if not external_logger.handlers:
+    fh = logging.FileHandler(EXTERNAL_API_AUDIT_LOG)
+    fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    external_logger.addHandler(fh)
+
+def log_external_call(org_id: str, endpoint: str, status_code: int, message: str = "", api_key_hash: str = ""):
+    """Log external API call for auditing."""
+    prefix = f"[{org_id}] {endpoint} -> {status_code}"
+    if message:
+        prefix += f" ({message})"
+    if api_key_hash:
+        prefix += f" [key:{api_key_hash[:8]}]"
+    external_logger.info(prefix)
+
+# =====================================================================
+# REDIS CLIENT & API KEY MANAGER
 # =====================================================================
 redis_client = build_redis_client()
 auth_store = AuthStore(AUTH_FILE)
+api_key_manager = ApiKeyManager(API_KEYS_FILE)
 
 
 async def wait_for_redis(retries: int = 15, delay_seconds: float = 2.0):
@@ -379,6 +402,19 @@ class CpAssignBody(BaseModel):
     cp_id: str
     org_id: str
     alias: Optional[str] = None
+
+class ApiKeyGenerateBody(BaseModel):
+    org_id: str
+    rate_limit: int = 120
+
+class ApiKeyRevokeBody(BaseModel):
+    org_id: str
+    key_hash: str
+
+class ApiKeyStatusBody(BaseModel):
+    org_id: str
+    key_hash: str
+    active: bool
 
 class OcppCommandBody(BaseModel):
     cp_id: str
@@ -900,6 +936,50 @@ async def api_cps(session=Depends(require_auth)):
 
     aliases = {cp: (cps_meta.get(cp, {}).get("alias") or cp) for cp in visible}
     return {"connected": visible, "aliases": aliases}
+
+# =====================================================================
+# EXTERNAL API KEY MANAGEMENT (ADMIN)
+# =====================================================================
+@app.get("/api/admin/external/keys")
+async def admin_get_api_keys(session=Depends(require_portal_admin)):
+    """List all external API keys with live last_used from Redis."""
+    keys = api_key_manager.list_all_keys()
+    for k in keys:
+        # Merge last_used from Redis
+        redis_last_used = redis_client.get(f"api_key_last_used:{k['hash']}")
+        if redis_last_used:
+            k["last_used"] = redis_last_used.decode()
+    return keys
+
+@app.post("/api/admin/external/keys/generate")
+async def admin_generate_api_key(body: ApiKeyGenerateBody, session=Depends(require_portal_admin)):
+    """Generate a new API key for an organization."""
+    org_id = body.org_id
+    rate_limit = body.rate_limit
+    orgs = load_orgs()
+    if org_id not in orgs:
+        raise HTTPException(400, "Ogiltig organisation")
+    
+    raw_key, key_hash = api_key_manager.generate_key_for_org(org_id, rate_limit)
+    return {"ok": True, "raw_key": raw_key, "key_hash": key_hash}
+
+@app.post("/api/admin/external/keys/revoke")
+async def admin_revoke_api_key(body: ApiKeyRevokeBody, session=Depends(require_portal_admin)):
+    """Delete an API key permanently."""
+    org_id = body.org_id
+    key_hash = body.key_hash
+    success = api_key_manager.delete_key(org_id, key_hash)
+    if not success:
+        raise HTTPException(400, "Kunde inte ta bort nyckeln")
+    return {"ok": True}
+
+@app.post("/api/admin/external/keys/status")
+async def admin_set_api_key_status(body: ApiKeyStatusBody, session=Depends(require_portal_admin)):
+    """Pause or reactivate an API key."""
+    success = api_key_manager.set_key_active_status(body.org_id, body.key_hash, body.active)
+    if not success:
+        raise HTTPException(400, "Kunde inte uppdatera nyckelns status")
+    return {"ok": True}
 
 @app.get("/api/status")
 async def api_status(session=Depends(require_auth)):
@@ -1684,6 +1764,648 @@ async def api_users_import_csv(
         },
         "results": results,
     }
+
+# =====================================================================
+# EXTERNAL API - Third-party Integration (Rate-Limited)
+# =====================================================================
+
+# Rate limiting: track requests per API key (store in Redis)
+def check_rate_limit(api_key: str, requests_per_hour: int = 120) -> bool:
+    """
+    Check if API key has exceeded rate limit.
+    Returns True if within limit, False if exceeded.
+    """
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    redis_key = f"api_rate_limit:{key_hash}"
+    
+    current = redis_client.incr(redis_key)
+    if current == 1:
+        # First request in this window, set expiry
+        redis_client.expire(redis_key, 3600)  # 1 hour
+    
+    return current <= requests_per_hour
+
+
+def validate_external_api_key(request: Request, api_key: str = Query(..., min_length=1)) -> Dict[str, str]:
+    """
+    Dependency: Validate external API key and return org_id.
+    Raises 401 if invalid, 429 if rate limited.
+    """
+    # OPTION 1: Use Redis for last_used tracking instead of disk
+    result = api_key_manager.validate_key(api_key, update_last_used=False)
+    
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    endpoint = request.url.path
+    
+    if not result:
+        log_external_call("unknown", endpoint, 401, "Invalid API Key", key_hash)
+        raise HTTPException(401, json.dumps({
+            "error": "invalid_api_key",
+            "message": "The provided API key is not valid",
+            "code": 401
+        }), headers={"Content-Type": "application/json"})
+    
+    org_id = result.get("org_id", "default")
+    
+    # Update last_used in Redis
+    redis_client.set(f"api_key_last_used:{key_hash}", iso_now())
+    
+    # OPTION 4: Configurable Rate Limits
+    rate_limit = result.get("rate_limit", 120)
+    
+    if not check_rate_limit(api_key, rate_limit):
+        log_external_call(org_id, endpoint, 429, f"Rate limit exceeded ({rate_limit})", key_hash)
+        raise HTTPException(429, json.dumps({
+            "error": "rate_limit_exceeded",
+            "message": f"Too many requests. Limit: {rate_limit} requests per hour",
+            "code": 429
+        }), headers={"Content-Type": "application/json"})
+    
+    # Option 6: Audit log (will be completed in the final endpoint for success)
+    # But we return the result here
+    return {
+        "org_id": org_id,
+        "api_key": api_key,
+        "key_hash": key_hash
+    }
+
+
+def get_connector_status(cp_id: str, connector_id: int) -> Optional[Dict]:
+    """Fetch connector status from Redis."""
+    key = f"connector_status:{cp_id}:{connector_id}"
+    data = redis_client.get(key)
+    if not data:
+        return None
+    try:
+        return json.loads(data.decode())
+    except:
+        return None
+
+
+@app.get("/api/v1/chargers")
+async def v1_get_chargers(
+    api_key: Dict = Depends(validate_external_api_key),
+) -> dict:
+    """
+    [v1] Get all chargers in organization with status, metrics and config.
+    
+    Returns ALL chargers belonging to the authenticated organization, 
+    including those currently offline.
+    """
+    org_id = api_key.get("org_id", "default")
+    
+    # Load all data
+    cps_map = normalize_cps_map(load_cps_map())
+    orgs = load_orgs()
+    txs = load_transactions()
+    
+    # Get connected CPs
+    connected_cps = redis_client.smembers("connected_cps")
+    connected_set = {cp.decode() for cp in connected_cps}
+    
+    # Build metrics per CP for ALL chargers in this org
+    cp_metrics: Dict[str, Dict] = {}
+    for cp_id, cp_data in cps_map.items():
+        if (cp_data.get("org_id") or "default") != org_id:
+            continue
+        
+        cp_metrics[cp_id] = {
+            "session_count": 0,
+            "total_kwh": 0.0,
+            "connectors": set()
+        }
+    
+    # Aggregate transaction metrics
+    for tx in txs:
+        cp_id = tx.get("charge_point", "")
+        if cp_id not in cp_metrics:
+            continue
+        
+        meter_start = float(tx.get("meter_start") or 0)
+        meter_stop = float(tx.get("meter_stop") or 0)
+        kwh = max(0.0, (meter_stop - meter_start) / 1000.0)
+        
+        cp_metrics[cp_id]["total_kwh"] += kwh
+        cp_metrics[cp_id]["session_count"] += 1
+        
+        connector_id = tx.get("connectorId")
+        if connector_id:
+            cp_metrics[cp_id]["connectors"].add(int(connector_id))
+    
+    # Build response items
+    items = []
+    for cp_id, metrics in cp_metrics.items():
+        cp_data = cps_map.get(cp_id, {})
+        
+        # Get current status
+        current_status = "Unknown"
+        last_updated = None
+        
+        # Fallback connectors if none found in transactions
+        connectors = sorted(list(metrics["connectors"])) if metrics["connectors"] else [1, 2]
+        
+        for conn_id in connectors:
+            status_data = get_connector_status(cp_id, conn_id)
+            if status_data:
+                current_status = status_data.get("status", "Unknown")
+                last_updated = status_data.get("timestamp")
+                break
+        
+        items.append({
+            "cp_id": cp_id,
+            "alias": cp_data.get("alias", cp_id),
+            "org_id": cp_data.get("org_id", "default"),
+            "org_name": orgs.get(org_id, {}).get("name", org_id),
+            "current_status": current_status,
+            "last_updated": last_updated,
+            "total_kwh_lifetime": round(metrics["total_kwh"], 3),
+            "session_count": metrics["session_count"],
+            "connector_count": len(metrics["connectors"]) if metrics["connectors"] else 0,
+            "location": cp_data.get("location"),
+            "owner": cp_data.get("owner")
+        })
+    
+    items.sort(key=lambda x: x["alias"])
+    
+    log_external_call(org_id, "/api/v1/chargers", 200, f"Returned {len(items)} chargers", api_key.get("key_hash", ""))
+    
+    return {
+        "ok": True,
+        "org_id": org_id,
+        "org_name": orgs.get(org_id, {}).get("name", org_id),
+        "generated_at": iso_now(),
+        "chargers": items,
+        "count": len(items)
+    }
+
+
+@app.get("/api/v1/energy")
+async def v1_get_energy(
+    group_by: str = Query(..., description="Group by: 'user', 'connector', or 'charger'"),
+    period: str = Query("24h", description="Time period: '24h' or '1m'"),
+    org_id: Optional[str] = Query(None, description="Optional: Validate against this org_id"),
+    api_key: Dict = Depends(validate_external_api_key),
+) -> dict:
+    """
+    [v1] Get energy consumption with advanced grouping and detailed session data.
+    
+    Query Parameters:
+    - api_key: Your API key (required)
+    - group_by: "user", "connector", or "charger"
+    - period: "24h" (last 24 hours) or "1m" (last month)
+    - org_id: (Optional) Verify the request is for this specific organization
+    """
+    if group_by not in ("user", "connector", "charger"):
+        raise HTTPException(400, json.dumps({
+            "error": "invalid_parameter",
+            "message": "group_by must be 'user', 'connector', or 'charger'",
+            "code": 400
+        }), headers={"Content-Type": "application/json"})
+    
+    if period not in ("24h", "1m"):
+        raise HTTPException(400, json.dumps({
+            "error": "invalid_parameter",
+            "message": "period must be '24h' or '1m'",
+            "code": 400
+        }), headers={"Content-Type": "application/json"})
+    
+    auth_org_id = api_key.get("org_id", "default")
+    
+    # Optional org_id validation
+    if org_id and org_id != auth_org_id:
+        raise HTTPException(403, json.dumps({
+            "error": "forbidden",
+            "message": f"API key is not authorized for organization '{org_id}'",
+            "code": 403
+        }), headers={"Content-Type": "application/json"})
+    
+    # Calculate cutoff time
+    now = datetime.now(timezone.utc)
+    if period == "24h":
+        cutoff = now - timedelta(hours=24)
+    else:  # 1m
+        cutoff = now - timedelta(days=30)
+    
+    # Load data
+    txs = load_transactions()
+    cps_map = normalize_cps_map(load_cps_map())
+    orgs = load_orgs()
+    
+    # Aggregate data
+    aggregates: Dict[str, Dict] = {}
+    
+    for tx in txs:
+        # Check org - prioritize tx record, fallback to CP config
+        cp_id = tx.get("charge_point", "unknown")
+        tx_org = tx.get("org_id") or cps_map.get(cp_id, {}).get("org_id", "default")
+        
+        if tx_org != auth_org_id:
+            continue
+        
+        # Check time window
+        stop_time_str = tx.get("stop_time")
+        if not stop_time_str:
+            continue
+        
+        try:
+            stop_dt = datetime.fromisoformat(stop_time_str.replace("Z", "+00:00"))
+        except:
+            continue
+        
+        if stop_dt < cutoff:
+            continue
+        
+        # Calculate energy
+        meter_start = float(tx.get("meter_start") or 0)
+        meter_stop = float(tx.get("meter_stop") or 0)
+        kwh = max(0.0, (meter_stop - meter_start) / 1000.0)
+        
+        # CP Info
+        cp_id = tx.get("charge_point", "unknown")
+        connector_id = tx.get("connectorId", 0)
+        cp_alias = tx.get("charge_point_alias") or cps_map.get(cp_id, {}).get("alias", cp_id)
+        
+        # User Info
+        user_email = (tx.get("user_email") or "").strip().lower() or "unknown"
+        user_name = tx.get("user_name", user_email)
+        
+        # Determine group key
+        if group_by == "user":
+            group_key = f"user:{user_email}"
+            display = f"{user_name} ({user_email})"
+        elif group_by == "charger":
+            group_key = f"charger:{cp_id}"
+            display = f"{cp_alias} ({cp_id})"
+        else:  # connector
+            group_key = f"connector:{cp_id}:{connector_id}"
+            display = f"{cp_alias} / Connector {connector_id}"
+        
+        if group_key not in aggregates:
+            aggregates[group_key] = {
+                "display": display,
+                "total_kwh": 0.0,
+                "session_count": 0,
+                "sessions": []
+            }
+        
+        aggregates[group_key]["total_kwh"] += kwh
+        aggregates[group_key]["session_count"] += 1
+        
+        # Detail session data
+        start_time_str = tx.get("start_time")
+        duration_minutes = None
+        if start_time_str and stop_time_str:
+            try:
+                start_dt = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
+                duration_minutes = round(max(0, (stop_dt - start_dt).total_seconds() / 60), 1)
+            except:
+                pass
+
+        aggregates[group_key]["sessions"].append({
+            "start_time": start_time_str,
+            "stop_time": stop_time_str,
+            "energy_kwh": round(kwh, 3),
+            "duration_minutes": duration_minutes,
+            "user_name": user_name,
+            "user_email": user_email if user_email != "unknown" else None,
+            "cp_id": cp_id,
+            "connector_id": int(connector_id),
+            "cp_alias": cp_alias,
+            "meter_start": meter_start,
+            "meter_stop": meter_stop
+        })
+    
+    # Build response
+    groups = []
+    total_sessions_in_response = 0
+    MAX_RECORDS = 10000
+    
+    # Sort aggregates by energy (descending)
+    sorted_groups_items = sorted(aggregates.items(), key=lambda x: x[1]["total_kwh"], reverse=True)
+    
+    for group_key, group_data in sorted_groups_items:
+        if total_sessions_in_response >= MAX_RECORDS:
+            break
+            
+        sessions_to_add = group_data["sessions"]
+        if total_sessions_in_response + len(sessions_to_add) > MAX_RECORDS:
+            sessions_to_add = sessions_to_add[:MAX_RECORDS - total_sessions_in_response]
+            
+        if not sessions_to_add and total_sessions_in_response >= MAX_RECORDS:
+             break
+
+        groups.append({
+            "group_key": group_key,
+            "display": group_data["display"],
+            "total_kwh": round(group_data["total_kwh"], 3),
+            "session_count": group_data["session_count"],
+            "sessions": sessions_to_add
+        })
+        total_sessions_in_response += len(sessions_to_add)
+    
+    log_external_call(auth_org_id, "/api/v1/energy", 200, f"Returned {len(groups)} groups, {total_sessions_in_response} sessions", api_key.get("key_hash", ""))
+    
+    return {
+        "ok": True,
+        "org_id": auth_org_id,
+        "org_name": orgs.get(auth_org_id, {}).get("name", auth_org_id),
+        "period": period,
+        "group_by": group_by,
+        "generated_at": iso_now(),
+        "groups": groups,
+        "count": len(groups),
+        "totals": {
+            "total_kwh": round(sum(g["total_kwh"] for g in groups), 3),
+            "total_sessions": sum(g["session_count"] for g in groups)
+        },
+        "pagination": {
+            "limit": MAX_RECORDS,
+            "returned_sessions": total_sessions_in_response
+        }
+    }
+
+
+@app.get("/api/external/chargers")
+async def external_get_chargers(
+    api_key: Dict = Depends(validate_external_api_key),
+) -> dict:
+    """
+    Get all chargers in organization with current status and metrics.
+    
+    Query Parameters:
+    - api_key: Your API key (required)
+    
+    Response fields per charger:
+    - cp_id: Charge point identifier
+    - alias: Display name
+    - org_id: Organization ID
+    - org_name: Organization name
+    - current_status: Current status (Available, Charging, etc.)
+    - last_updated: ISO timestamp of last status update
+    - total_kwh_lifetime: Total energy delivered (all time)
+    - session_count: Total number of charging sessions
+    - connector_count: Number of connectors (estimated from data)
+    - location: Location/address (if available)
+    - owner: Operator/owner name
+    """
+    org_id = api_key.get("org_id", "default")
+    
+    # Load all data
+    cps_map = normalize_cps_map(load_cps_map())
+    orgs = load_orgs()
+    txs = load_transactions()
+    
+    # Get connected CPs in this org
+    connected_cps = redis_client.smembers("connected_cps")
+    connected_set = {cp.decode() for cp in connected_cps}
+    
+    # Build metrics per CP
+    cp_metrics: Dict[str, Dict] = {}
+    for cp_id, cp_data in cps_map.items():
+        if (cp_data.get("org_id") or "default") != org_id:
+            continue
+        
+        cp_metrics[cp_id] = {
+            "session_count": 0,
+            "total_kwh": 0.0,
+            "connectors": set()
+        }
+    
+    # Aggregate transaction metrics
+    for tx in txs:
+        cp_id = tx.get("charge_point", "")
+        if cp_id not in cp_metrics:
+            continue
+        
+        meter_start = float(tx.get("meter_start") or 0)
+        meter_stop = float(tx.get("meter_stop") or 0)
+        kwh = max(0.0, (meter_stop - meter_start) / 1000.0)
+        
+        cp_metrics[cp_id]["total_kwh"] += kwh
+        cp_metrics[cp_id]["session_count"] += 1
+        
+        connector_id = tx.get("connectorId")
+        if connector_id:
+            cp_metrics[cp_id]["connectors"].add(int(connector_id))
+    
+    # Build response items
+    items = []
+    for cp_id in connected_set:
+        cp_data = cps_map.get(cp_id, {})
+        
+        metrics = cp_metrics.get(cp_id, {
+            "session_count": 0,
+            "total_kwh": 0.0,
+            "connectors": set()
+        })
+        
+        # Get current status (from first connector if available)
+        current_status = "Unknown"
+        last_updated = None
+        connectors = list(metrics["connectors"]) if metrics["connectors"] else [0, 1, 2]
+        
+        for conn_id in connectors:
+            status_data = get_connector_status(cp_id, conn_id)
+            if status_data:
+                current_status = status_data.get("status", "Unknown")
+                last_updated = status_data.get("timestamp")
+                break
+        
+        items.append({
+            "cp_id": cp_id,
+            "alias": cp_data.get("alias", cp_id),
+            "org_id": cp_data.get("org_id", "default"),
+            "org_name": orgs.get(org_id, {}).get("name", org_id),
+            "current_status": current_status,
+            "last_updated": last_updated,
+            "total_kwh_lifetime": round(metrics["total_kwh"], 3),
+            "session_count": metrics["session_count"],
+            "connector_count": len(metrics["connectors"]) if metrics["connectors"] else 0,
+            "location": cp_data.get("location"),
+            "owner": cp_data.get("owner"),
+            "is_connected": cp_id in connected_set
+        })
+    
+    items.sort(key=lambda x: x["alias"])
+    
+    return {
+        "ok": True,
+        "org_id": org_id,
+        "org_name": orgs.get(org_id, {}).get("name", org_id),
+        "generated_at": iso_now(),
+        "chargers": items,
+        "count": len(items),
+        "pagination": {
+            "limit": 10000,
+            "returned": len(items)
+        }
+    }
+
+
+@app.get("/api/external/energy")
+async def external_get_energy(
+    group_by: str = Query(..., description="Group by: 'user' or 'connector'"),
+    period: str = Query("24h", description="Time period: '24h' or '1m' (month)"),
+    api_key: Dict = Depends(validate_external_api_key),
+) -> dict:
+    """
+    Get energy consumption grouped by user or connector.
+    
+    Query Parameters:
+    - api_key: Your API key (required)
+    - group_by: "user" or "connector"
+    - period: "24h" (last 24 hours) or "1m" (last month)
+    
+    Response format (summary):
+    {
+        "groups": [
+            {
+                "group_key": "user:email@example.com",
+                "total_kwh": 150.5,
+                "session_count": 12
+            },
+            ...
+        ]
+    }
+    """
+    if group_by not in ("user", "connector"):
+        raise HTTPException(400, json.dumps({
+            "error": "invalid_parameter",
+            "message": "group_by must be 'user' or 'connector'",
+            "code": 400
+        }), headers={"Content-Type": "application/json"})
+    
+    if period not in ("24h", "1m"):
+        raise HTTPException(400, json.dumps({
+            "error": "invalid_parameter",
+            "message": "period must be '24h' or '1m'",
+            "code": 400
+        }), headers={"Content-Type": "application/json"})
+    
+    org_id = api_key.get("org_id", "default")
+    
+    # Calculate cutoff time
+    now = datetime.now(timezone.utc)
+    if period == "24h":
+        cutoff = now - timedelta(hours=24)
+    else:  # 1m
+        cutoff = now - timedelta(days=30)
+    
+    # Load data
+    txs = load_transactions()
+    cps_map = normalize_cps_map(load_cps_map())
+    users_map = load_users_map()
+    rfids_map = load_rfids_map()
+    orgs = load_orgs()
+    
+    # Aggregate data
+    aggregates: Dict[str, Dict] = {}
+    
+    for tx in txs:
+        # Check org
+        tx_org = tx.get("org_id", "default")
+        if tx_org != org_id:
+            continue
+        
+        # Check time window
+        stop_time_str = tx.get("stop_time")
+        if not stop_time_str:
+            continue
+        
+        try:
+            stop_dt = datetime.fromisoformat(stop_time_str.replace("Z", "+00:00"))
+        except:
+            continue
+        
+        if stop_dt < cutoff:
+            continue
+        
+        # Calculate energy
+        meter_start = float(tx.get("meter_start") or 0)
+        meter_stop = float(tx.get("meter_stop") or 0)
+        kwh = max(0.0, (meter_stop - meter_start) / 1000.0)
+        
+        # Determine group key
+        if group_by == "user":
+            user_email = (tx.get("user_email") or "").strip().lower()
+            if not user_email:
+                user_email = "unknown"
+            user_name = tx.get("user_name", user_email)
+            group_key = f"user:{user_email}"
+            display = f"{user_name} ({user_email})"
+        else:  # connector
+            cp_id = tx.get("charge_point", "unknown")
+            connector_id = tx.get("connectorId", 0)
+            cp_alias = tx.get("charge_point_alias", cp_id)
+            group_key = f"connector:{cp_id}:{connector_id}"
+            display = f"{cp_alias} / Connector {connector_id}"
+        
+        if group_key not in aggregates:
+            aggregates[group_key] = {
+                "display": display,
+                "total_kwh": 0.0,
+                "session_count": 0,
+                "sessions": []
+            }
+        
+        aggregates[group_key]["total_kwh"] += kwh
+        aggregates[group_key]["session_count"] += 1
+        aggregates[group_key]["sessions"].append({
+            "start_time": tx.get("start_time"),
+            "stop_time": tx.get("stop_time"),
+            "energy_kwh": round(kwh, 3),
+            "duration_minutes": None  # Calculate if needed
+        })
+    
+    # Calculate durations
+    for group_data in aggregates.values():
+        for session in group_data["sessions"]:
+            try:
+                start_dt = datetime.fromisoformat(session["start_time"].replace("Z", "+00:00")) if session["start_time"] else None
+                stop_dt = datetime.fromisoformat(session["stop_time"].replace("Z", "+00:00")) if session["stop_time"] else None
+                if start_dt and stop_dt:
+                    duration = (stop_dt - start_dt).total_seconds() / 60
+                    session["duration_minutes"] = round(max(0, duration), 1)
+            except:
+                pass
+    
+    # Build response (summary only, full details in sessions)
+    groups = []
+    for group_key, group_data in sorted(aggregates.items()):
+        groups.append({
+            "group_key": group_key,
+            "display": group_data["display"],
+            "total_kwh": round(group_data["total_kwh"], 3),
+            "session_count": group_data["session_count"],
+            "sessions": group_data["sessions"][:10]  # Top 10 sessions
+        })
+    
+    # Sort by energy (descending)
+    groups.sort(key=lambda x: x["total_kwh"], reverse=True)
+    
+    # Limit to 10k records
+    if len(groups) > 10000:
+        groups = groups[:10000]
+    
+    return {
+        "ok": True,
+        "org_id": org_id,
+        "org_name": orgs.get(org_id, {}).get("name", org_id),
+        "period": period,
+        "group_by": group_by,
+        "generated_at": iso_now(),
+        "groups": groups,
+        "count": len(groups),
+        "totals": {
+            "total_kwh": round(sum(g["total_kwh"] for g in groups), 3),
+            "total_sessions": sum(g["session_count"] for g in groups)
+        },
+        "pagination": {
+            "limit": 10000,
+            "returned": len(groups)
+        }
+    }
+
 
 # =====================================================================
 # SUMMARY & HISTORY

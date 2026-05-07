@@ -95,6 +95,7 @@ services:
     container_name: backup-service
     restart: unless-stopped
     environment:
+      - PYTHONPATH=/app
       - BACKUP_ENABLED=${BACKUP_ENABLED:-false}
       - BACKUP_GIT_URL=${BACKUP_GIT_URL:-}
       - BACKUP_GIT_BRANCH=${BACKUP_GIT_BRANCH:-main}

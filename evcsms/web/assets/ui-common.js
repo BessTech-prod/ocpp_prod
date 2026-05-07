@@ -52,23 +52,26 @@
     return r.json();
   };
 
+  /* ----------------------------- UTILS ------------------------------------- */
+  UI.esc = function esc(s) {
+    return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+  };
+
   /* ----------------------------- NOTISER ----------------------------------- */
   UI.alert = function alertBox(msg, kind="danger", timeout=4500){
     const host = document.getElementById("page-alerts");
     if (!host) return;
     if (!msg) { host.innerHTML=""; return; }
-    const esc=(s)=> String(s ?? "").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
-    host.innerHTML = `<div class="alert alert-${kind}">${esc(msg)}</div>`;
+    host.innerHTML = `<div class="alert alert-${kind}">${UI.esc(msg)}</div>`;
     if (timeout>0) setTimeout(()=> host.innerHTML="", timeout);
   };
   UI.toast = function toast(msg, variant="success"){
     const stack=document.getElementById("toast-stack"); if(!stack) return;
-    const esc=(s)=> String(s ?? "").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
     const id="t_"+Date.now();
     stack.insertAdjacentHTML("beforeend", `
       <div id="${id}" class="toast align-items-center text-bg-${variant} border-0" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="d-flex">
-          <div class="toast-body">${esc(msg)}</div>
+          <div class="toast-body">${UI.esc(msg)}</div>
           <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
       </div>`);

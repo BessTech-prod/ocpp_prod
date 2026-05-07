@@ -21,6 +21,7 @@ services:
       - ./app:/app/app
       - ./api.py:/app/api.py
       - ./ocpp_ws.py:/app/ocpp_ws.py
+      - ./docker/nginx.single.conf:/etc/nginx/nginx.conf
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
