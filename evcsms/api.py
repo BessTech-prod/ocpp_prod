@@ -1963,7 +1963,7 @@ async def v1_get_chargers(
 @app.get("/api/v1/energy")
 async def v1_get_energy(
     group_by: str = Query(..., description="Group by: 'user', 'connector', or 'charger'"),
-    period: str = Query("24h", description="Time period: '24h' or '1m'"),
+    period: str = Query("24h", description="Time period: '24h', '1m', '2m', etc."),
     org_id: Optional[str] = Query(None, description="Optional: Validate against this org_id"),
     api_key: Dict = Depends(validate_external_api_key),
 ) -> dict:
@@ -1973,7 +1973,7 @@ async def v1_get_energy(
     Query Parameters:
     - api_key: Your API key (required)
     - group_by: "user", "connector", or "charger"
-    - period: "24h" (last 24 hours) or "1m" (last month)
+    - period: "24h" (last 24 hours) or "Xm" (number of months, e.g. "1m", "3m")
     - org_id: (Optional) Verify the request is for this specific organization
     """
     if group_by not in ("user", "connector", "charger"):
@@ -1983,10 +1983,11 @@ async def v1_get_energy(
             "code": 400
         }), headers={"Content-Type": "application/json"})
     
-    if period not in ("24h", "1m"):
+    is_valid_period = (period == "24h") or (period.endswith("m") and period[:-1].isdigit())
+    if not is_valid_period:
         raise HTTPException(400, json.dumps({
             "error": "invalid_parameter",
-            "message": "period must be '24h' or '1m'",
+            "message": "period must be '24h' or a number of months (e.g. '1m', '3m')",
             "code": 400
         }), headers={"Content-Type": "application/json"})
     
@@ -2004,8 +2005,12 @@ async def v1_get_energy(
     now = datetime.now(timezone.utc)
     if period == "24h":
         cutoff = now - timedelta(hours=24)
-    else:  # 1m
-        cutoff = now - timedelta(days=30)
+    else:
+        try:
+            months = int(period[:-1])
+            cutoff = now - timedelta(days=30 * months)
+        except ValueError:
+            cutoff = now - timedelta(days=30)
     
     # Load data
     txs = load_transactions()
@@ -2266,7 +2271,7 @@ async def external_get_chargers(
 @app.get("/api/external/energy")
 async def external_get_energy(
     group_by: str = Query(..., description="Group by: 'user' or 'connector'"),
-    period: str = Query("24h", description="Time period: '24h' or '1m' (month)"),
+    period: str = Query("24h", description="Time period: '24h', '1m', '2m', etc."),
     api_key: Dict = Depends(validate_external_api_key),
 ) -> dict:
     """
@@ -2275,7 +2280,7 @@ async def external_get_energy(
     Query Parameters:
     - api_key: Your API key (required)
     - group_by: "user" or "connector"
-    - period: "24h" (last 24 hours) or "1m" (last month)
+    - period: "24h" (last 24 hours) or "Xm" (number of months, e.g. "1m", "3m")
     
     Response format (summary):
     {
@@ -2296,10 +2301,11 @@ async def external_get_energy(
             "code": 400
         }), headers={"Content-Type": "application/json"})
     
-    if period not in ("24h", "1m"):
+    is_valid_period = (period == "24h") or (period.endswith("m") and period[:-1].isdigit())
+    if not is_valid_period:
         raise HTTPException(400, json.dumps({
             "error": "invalid_parameter",
-            "message": "period must be '24h' or '1m'",
+            "message": "period must be '24h' or a number of months (e.g. '1m', '3m')",
             "code": 400
         }), headers={"Content-Type": "application/json"})
     
@@ -2309,8 +2315,12 @@ async def external_get_energy(
     now = datetime.now(timezone.utc)
     if period == "24h":
         cutoff = now - timedelta(hours=24)
-    else:  # 1m
-        cutoff = now - timedelta(days=30)
+    else:
+        try:
+            months = int(period[:-1])
+            cutoff = now - timedelta(days=30 * months)
+        except ValueError:
+            cutoff = now - timedelta(days=30)
     
     # Load data
     txs = load_transactions()

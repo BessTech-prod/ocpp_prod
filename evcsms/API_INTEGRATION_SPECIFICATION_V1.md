@@ -89,7 +89,7 @@ Returnerar aggregerad data för energiförbrukning och detaljerade laddsessioner
 | :--- | :--- | :--- | :--- |
 | `api_key` | String | Ja | Din unika API-nyckel. |
 | `group_by` | String | Ja | Gruppering: `user`, `charger` eller `connector`. |
-| `period` | String | Nej | Tidspann: `24h` (standard) eller `1m` (senaste 30 dagarna). |
+| `period` | String | Nej | Tidspann: `24h` (standard), `1m`, `3m` etc (antal månader). |
 
 #### Exempel på svar
 ```json

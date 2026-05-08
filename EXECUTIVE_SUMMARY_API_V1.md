@@ -21,7 +21,7 @@ Att erbjuda en säker, högpresterande och skalbar brygga mellan TakoramaCharge 
 
 2.  **Energy API (`/energy`)**
     *   Aggregerad förbrukning per användare, laddare eller kontakt.
-    *   Flexibla tidsperioder (senaste 24h eller 30 dagar).
+    *   Flexibla tidsperioder (senaste 24h, 1m, 3m etc).
     *   Detaljerad sessionsdata inklusive mätarvärden (MeterStart/Stop).
 
 ### ⚙️ Snabb Onboarding

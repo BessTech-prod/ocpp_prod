@@ -79,7 +79,7 @@ Returns aggregated energy consumption and detailed session data for the organiza
 **Parameters:**
 - `api_key` (required): Your API key.
 - `group_by` (required): How to group the data. One of: `user`, `connector`, `charger`.
-- `period` (optional): Time period for the report. One of: `24h` (default), `1m` (last 30 days).
+- `period` (optional): Time period for the report. One of: `24h` (default), `1m`, `2m`, etc. (Xm for X months).
 - `org_id` (optional): If provided, the API will verify that the API key is authorized for this specific organization.
 
 **Response Structure:**
