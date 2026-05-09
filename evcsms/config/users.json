@@ -46,8 +46,8 @@
     "email": "admin@takorama.se",
     "role": "portal_admin",
     "org_id": "default",
-    "pwd_salt": "oBMxBNM36DgZ1bnRTJ_uKw",
-    "pwd_hash": "VrnpvF8SKDbEn4NRrIdixTgw3sOqswVxX80AfLw8sy0"
+    "pwd_salt": "y1EnOnrEt8TIwKBJzuUiMg",
+    "pwd_hash": "f470aGu3jNXCVUWcTp9rpRh7eowiIpW0aQrInzpU59s"
   },
   "UNSET-E7BFFBBB": {
     "first_name": "Erik",
