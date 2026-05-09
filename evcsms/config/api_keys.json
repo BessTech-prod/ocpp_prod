@@ -1,0 +1,18 @@
+{
+  "acc834f25efd84cad771e4e7cde66e2fa0bca73a091c5890580acb6b1ba3b3cf": {
+    "org_id": "Takorama_Storås",
+    "created_at": "2026-05-07T19:29:18.310897+00:00",
+    "last_used": null,
+    "rate_limit": 120,
+    "ip_whitelist": [],
+    "active": true
+  },
+  "f4d0d52b40f7959b6986c1b39a8a3539c60b9ef1052b9c529d9ea688896d6c0b": {
+    "org_id": "Takorama_Storås",
+    "created_at": "2026-05-08T08:26:56.725362+00:00",
+    "last_used": null,
+    "rate_limit": 1000,
+    "ip_whitelist": [],
+    "active": true
+  }
+}
