@@ -2022,22 +2022,17 @@ async def v1_get_energy(
     aggregates: Dict[str, Dict] = {}
     
     for tx in txs:
-        # Check org - prioritize tx record, fallback to CP config, fallback to RFID ownership
-        cp_id = tx.get("charge_point", "unknown")
+        # Check org - prioritize RFID ownership to match UI behavior
         id_tag = normalize_tag(tx.get("id_tag", ""))
+        tag_info = rfids_map.get(id_tag, {})
+        tag_org = tag_info.get("org_id") or "default"
         
-        tx_org = tx.get("org_id") or cps_map.get(cp_id, {}).get("org_id")
+        # Fallback to transaction record or CP config
+        cp_id = tx.get("charge_point", "unknown")
+        tx_org = tx.get("org_id") or cps_map.get(cp_id, {}).get("org_id") or "default"
         
-        # If still not found, check if the RFID used in the transaction belongs to the org
-        if not tx_org and id_tag:
-            tag_info = rfids_map.get(id_tag, {})
-            if (tag_info.get("org_id") or "default") == auth_org_id:
-                tx_org = auth_org_id
-        
-        if not tx_org:
-            tx_org = "default"
-
-        if tx_org != auth_org_id:
+        # Include if either the RFID or the Charger belongs to this org
+        if tag_org != auth_org_id and tx_org != auth_org_id:
             continue
         
         # Check time window
@@ -2343,24 +2338,20 @@ async def external_get_energy(
     
     # Aggregate data
     aggregates: Dict[str, Dict] = {}
+    MAX_RECORDS = 50000
     
     for tx in txs:
-        # Check org - prioritize tx record, fallback to CP config, fallback to RFID ownership
-        cp_id = tx.get("charge_point", "unknown")
+        # Check org - prioritize RFID ownership to match UI behavior
         id_tag = normalize_tag(tx.get("id_tag", ""))
+        tag_info = rfids_map.get(id_tag, {})
+        tag_org = tag_info.get("org_id") or "default"
         
-        tx_org = tx.get("org_id") or cps_map.get(cp_id, {}).get("org_id")
+        # Fallback to transaction record or CP config
+        cp_id = tx.get("charge_point", "unknown")
+        tx_org = tx.get("org_id") or cps_map.get(cp_id, {}).get("org_id") or "default"
         
-        # If still not found, check if the RFID used in the transaction belongs to the org
-        if not tx_org and id_tag:
-            tag_info = rfids_map.get(id_tag, {})
-            if (tag_info.get("org_id") or "default") == org_id:
-                tx_org = org_id
-
-        if not tx_org:
-            tx_org = "default"
-
-        if tx_org != org_id:
+        # Include if either the RFID or the Charger belongs to this org
+        if tag_org != org_id and tx_org != org_id:
             continue
         
         # Check time window
@@ -2439,9 +2430,11 @@ async def external_get_energy(
     # Sort by energy (descending)
     groups.sort(key=lambda x: x["total_kwh"], reverse=True)
     
-    # Limit to 10k records
-    if len(groups) > 10000:
-        groups = groups[:10000]
+    # Limit to MAX_RECORDS
+    if len(groups) > MAX_RECORDS:
+        groups = groups[:MAX_RECORDS]
+    
+    total_sessions_in_response = sum(g["session_count"] for g in groups)
     
     return {
         "ok": True,
@@ -2454,11 +2447,11 @@ async def external_get_energy(
         "count": len(groups),
         "totals": {
             "total_kwh": round(sum(g["total_kwh"] for g in groups), 3),
-            "total_sessions": sum(g["session_count"] for g in groups)
+            "total_sessions": total_sessions_in_response
         },
         "pagination": {
-            "limit": 10000,
-            "returned": len(groups),
+            "limit": MAX_RECORDS,
+            "returned_sessions": total_sessions_in_response,
             "info": "Each group limited to 1000 sessions"
         }
     }
