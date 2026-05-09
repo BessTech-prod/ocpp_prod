@@ -372,6 +372,11 @@ def require_portal_admin(s=Depends(get_session)):
         raise HTTPException(403, "Portal admin required")
     return s
 
+def require_installer_or_higher(s=Depends(get_session)):
+    if (s.get("role") or "").lower() not in ("portal_admin", "admin", "installer"):
+        raise HTTPException(403, "Portal admin or installer required")
+    return s
+
 def require_org_admin_or_portal(s=Depends(get_session)):
     if (s.get("role") or "").lower() not in ("org_admin", "portal_admin", "admin"):
         raise HTTPException(403, "Admin/org_admin required")
@@ -600,6 +605,9 @@ def normalize_import_role(value: str) -> str:
         "portal admin": "portal_admin",
         "org-admin": "org_admin",
         "org admin": "org_admin",
+        "installer": "installer",
+        "installatör": "installer",
+        "inst": "installer",
     }
     role = aliases.get(role, role)
     return role
@@ -646,12 +654,12 @@ def process_import_row(
         raise ValueError("email är ogiltig")
     if not name:
         raise ValueError("name eller first_name/last_name krävs")
-    if role not in ("user", "org_admin", "portal_admin"):
-        raise ValueError("role måste vara user, org_admin eller portal_admin")
+    if role not in ("user", "org_admin", "portal_admin", "installer"):
+        raise ValueError("role måste vara user, org_admin, portal_admin eller installer")
 
     if role_session in ("org_admin",):
-        if role == "portal_admin":
-            raise ValueError("org_admin får inte skapa portal_admin")
+        if role in ("portal_admin", "installer"):
+            raise ValueError("org_admin får inte skapa portal_admin eller installer")
         requested_org = (row.get("org_id") or "").strip()
         session_org = (session.get("org_id") or "").strip()
         if requested_org and requested_org != session_org:
@@ -806,7 +814,7 @@ async def api_me(session=Depends(require_auth)):
 async def api_orgs(session=Depends(require_auth)):
     orgs = load_orgs()
     role = session.get("role")
-    if role in ("portal_admin", "admin"):
+    if role in ("portal_admin", "admin", "installer"):
         return orgs
     oid = session.get("org_id")
     return {oid: orgs.get(oid)} if oid in orgs else {}
@@ -860,11 +868,11 @@ async def api_orgs_delete(org_id: str, force: bool = False, session=Depends(requ
 # CPS (CHARGE POINTS) API
 # =====================================================================
 @app.get("/api/cps/map")
-async def api_cps_map(session=Depends(require_portal_admin)):
+async def api_cps_map(session=Depends(require_installer_or_higher)):
     return normalize_cps_map(load_cps_map())
 
 @app.post("/api/cps/map")
-async def api_cps_assign(body: CpAssignBody, session=Depends(require_portal_admin)):
+async def api_cps_assign(body: CpAssignBody, session=Depends(require_installer_or_higher)):
     ensure_default_org()
     cp_id = body.cp_id.strip()
     org_id = body.org_id.strip()
@@ -882,7 +890,7 @@ async def api_cps_assign(body: CpAssignBody, session=Depends(require_portal_admi
     return cps
 
 @app.delete("/api/cps/map")
-async def api_cps_unassign(cp_id: str = Query(...), session=Depends(require_portal_admin)):
+async def api_cps_unassign(cp_id: str = Query(...), session=Depends(require_installer_or_higher)):
     cps = normalize_cps_map(load_cps_map())
     if cp_id in cps:
         cps.pop(cp_id)
@@ -892,7 +900,7 @@ async def api_cps_unassign(cp_id: str = Query(...), session=Depends(require_port
 def allowed_cps_for_session(session: dict):
     """Portal_admin → alla CP. Org_admin → CP i egna orgen."""
     role = session.get("role")
-    if role in ("portal_admin", "admin"):
+    if role in ("portal_admin", "admin", "installer"):
         return None
     oid = session.get("org_id")
     cps = normalize_cps_map(load_cps_map())
@@ -1018,7 +1026,7 @@ async def api_status(session=Depends(require_auth)):
     return status_data
 
 @app.get("/api/portal/live/chargers")
-async def api_portal_live_chargers(org_id: Optional[str] = None, session=Depends(require_portal_admin)):
+async def api_portal_live_chargers(org_id: Optional[str] = None, session=Depends(require_installer_or_higher)):
     cps_map = normalize_cps_map(load_cps_map())
     connected_cps = redis_client.smembers("connected_cps")
     connected = sorted(cp.decode() for cp in connected_cps)
@@ -1045,7 +1053,7 @@ async def api_portal_live_chargers(org_id: Optional[str] = None, session=Depends
     }
 
 @app.post("/api/portal/ocpp/command")
-async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require_portal_admin)):
+async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require_installer_or_higher)):
     cp_id = (body.cp_id or "").strip()
     command = (body.command or "").strip().lower()
 
@@ -1102,7 +1110,7 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
     return {"ok": True, "command_id": command_id, "status": "queued"}
 
 @app.get("/api/portal/ocpp/command/{command_id}")
-async def api_portal_ocpp_command_status(command_id: str, session=Depends(require_portal_admin)):
+async def api_portal_ocpp_command_status(command_id: str, session=Depends(require_installer_or_higher)):
     raw = redis_client.get(f"ocpp:command_result:{command_id}")
     if not raw:
         raise HTTPException(404, "Kommandoresultat saknas eller har löpt ut")
@@ -1132,7 +1140,7 @@ async def api_users_map(session=Depends(require_auth)):
         users = by_rfid
     role = session.get("role")
 
-    if role in ("portal_admin", "admin"):
+    if role in ("portal_admin", "admin", "installer"):
         return users
     elif role == "org_admin":
         oid = session.get("org_id")
@@ -1147,7 +1155,7 @@ async def api_users_map(session=Depends(require_auth)):
         return mine
 
 @app.get("/api/users/unassigned")
-async def api_users_unassigned(session=Depends(require_org_admin_or_portal)):
+async def api_users_unassigned(session=Depends(require_installer_or_higher)):
     role = (session.get("role") or "").lower()
     scope_org = session.get("org_id")
     users = load_users_map()
@@ -1172,7 +1180,7 @@ async def api_users_unassigned(session=Depends(require_org_admin_or_portal)):
     return result
 
 @app.get("/api/rfids")
-async def api_rfids(org_id: Optional[str] = None, assigned: Optional[bool] = None, session=Depends(require_org_admin_or_portal)):
+async def api_rfids(org_id: Optional[str] = None, assigned: Optional[bool] = None, session=Depends(require_installer_or_higher)):
     role = (session.get("role") or "").lower()
     scope_org = session.get("org_id")
     users = load_users_map()
@@ -1216,7 +1224,7 @@ async def api_rfids(org_id: Optional[str] = None, assigned: Optional[bool] = Non
     return {"items": rows, "count": len(rows)}
 
 @app.get("/api/rfids/audit")
-async def api_rfids_audit(limit: int = 200, session=Depends(require_org_admin_or_portal)):
+async def api_rfids_audit(limit: int = 200, session=Depends(require_installer_or_higher)):
     role = (session.get("role") or "").lower()
     scope_org = session.get("org_id")
     rows = load_rfid_audit()
@@ -1534,7 +1542,7 @@ async def api_users_map_add(body: UserMapBody, req: Request, session=Depends(req
         raise HTTPException(400, "name eller first/last_name krävs")
 
     role = (body.role or "user").lower()
-    if role not in ("user", "org_admin", "portal_admin"):
+    if role not in ("user", "org_admin", "portal_admin", "installer"):
         raise HTTPException(400, "Ogiltig roll")
 
     # Portal-admin kan välja org_id. Org_admin är låst till sin egen org.
@@ -1546,8 +1554,8 @@ async def api_users_map_add(body: UserMapBody, req: Request, session=Depends(req
             raise HTTPException(400, "Okänd organisation")
     else:
         org_id = session.get("org_id")
-        if role == "portal_admin":
-            raise HTTPException(403, "org_admin får inte skapa portal_admin")
+        if role in ("portal_admin", "installer"):
+            raise HTTPException(403, f"org_admin får inte skapa {role}")
 
     tag = normalize_tag(body.tag or "")
     old_tag = normalize_tag(raw.get("old_tag") or body.old_tag or "")
@@ -2463,7 +2471,7 @@ async def external_get_energy(
 def _allowed_tags_for_session(session: dict, users_map: dict) -> Optional[Set[str]]:
     rfids = load_rfids_map()
     role = session.get("role")
-    if role in ("portal_admin", "admin"):
+    if role in ("portal_admin", "admin", "installer"):
         return None
     if role == "org_admin":
         oid = session.get("org_id")

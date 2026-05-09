@@ -114,5 +114,15 @@
     "org_id": "Takorama_Storås",
     "pwd_salt": "r99_9YVWps76ObwtMJySrQ",
     "pwd_hash": "uOUq530JV6DWmHnAqcpWbtsPQImTl8DUyG3LBFimZUQ"
+  },
+  "UNSET-43A8B2B0": {
+    "first_name": "Tako",
+    "last_name": "install",
+    "name": "Tako install",
+    "email": "info@takorama.se",
+    "role": "installer",
+    "org_id": "Takorama_Storås",
+    "pwd_salt": "1c7IAYZf_13HJXoLSHMNuw",
+    "pwd_hash": "CaRgxZ_YssF85L5UELrM82i4_s9GOOxbHIXU6TZA6g8"
   }
 }

@@ -166,5 +166,19 @@
     "user_email": null,
     "active": true,
     "updated_at": "2026-03-26T08:35:04.429633Z"
+  },
+  "UNSET-E95A254F": {
+    "alias": "UNSET-E95A254F",
+    "org_id": "default",
+    "user_email": null,
+    "active": true,
+    "updated_at": "2026-05-09T19:11:11.943208Z"
+  },
+  "UNSET-43A8B2B0": {
+    "alias": "UNSET-43A8B2B0",
+    "org_id": "Takorama_Storås",
+    "user_email": "info@takorama.se",
+    "active": true,
+    "updated_at": "2026-05-09T19:27:44.172342Z"
   }
 }

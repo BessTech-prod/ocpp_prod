@@ -8,6 +8,7 @@
       user: 'Användare',
       org_admin: 'Organisationsadmin',
       portal_admin: 'Portaladmin',
+      installer: 'Installatör',
       admin: 'Admin'
     };
     return map[String(role || '').toLowerCase()] || (role || '–');

@@ -125,6 +125,7 @@
       const me = await whoAmI();
       const role=(me.role||"").toLowerCase();
       if (role==="portal_admin" || role==="admin") window.location.href="/portal/index";
+      else if (role==="installer")                 window.location.href="/installer/index";
       else if (role==="org_admin")                 window.location.href="/org/index";
       else                                         window.location.href="/user/index";
     }catch{ window.location.href="/login.html"; }
@@ -132,9 +133,10 @@
   UI.requireRole = async function requireRole(allowedRoles){
     const me = await whoAmI();
     const role=(me.role||"").toLowerCase();
-    const allowed=(allowedRoles||["user","org_admin","portal_admin","admin"]).map(s=>s.toLowerCase());
+    const allowed=(allowedRoles||["user","org_admin","portal_admin","admin","installer"]).map(s=>s.toLowerCase());
     if (!allowed.includes(role)){
       if (role==="portal_admin" || role==="admin") window.location.href="/portal/index";
+      else if (role==="installer")                 window.location.href="/installer/index";
       else if (role==="org_admin")                 window.location.href="/org/index";
       else                                         window.location.href="/user/index";
       return null;
@@ -211,10 +213,11 @@ document.querySelectorAll('#navDashboard, .js-go-dashboard').forEach(a => {
     const role=(me?.role||"").toLowerCase();
     const pick=(a)=>{
       if (role==="portal_admin" || role==="admin") return a.getAttribute("data-route-portal");
+      if (role==="installer")                       return a.getAttribute("data-route-installer") || a.getAttribute("data-route-portal");
       if (role==="org_admin")                       return a.getAttribute("data-route-org");
       return a.getAttribute("data-route-user");
     };
-    document.querySelectorAll("a[data-route-portal], a[data-route-org], a[data-route-user]").forEach(a=>{
+    document.querySelectorAll("a[data-route-portal], a[data-route-installer], a[data-route-org], a[data-route-user]").forEach(a=>{
       const target = pick(a);
       if (target) {
         a.setAttribute("href", target);
