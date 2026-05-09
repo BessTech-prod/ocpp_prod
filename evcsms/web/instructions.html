@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <link rel="icon" type="image/png" href="/assets/transvit23.png">
+  <meta charset="utf-8" />
+  <title>Instruktioner - TakoramaCharge</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="bg-light">
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
+    <div class="container-fluid">
+      <a href="javascript:void(0)" class="navbar-brand d-flex align-items-center js-go-dashboard">
+        <img src="/assets/logo_trans_vit.png" srcset="/assets/logo_trans_vit.png 2x" class="brand-logo" alt="TakoramaCharge">
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain"><span class="navbar-toggler-icon"></span></button>
+      <div id="navMain" class="collapse navbar-collapse justify-content-end">
+        <ul class="navbar-nav align-items-center gap-2">
+          <li class="nav-item"><a class="nav-link js-go-dashboard" href="javascript:void(0)"><i class="bi bi-speedometer2"></i> Överblick</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/portal/live_ops.html"><i class="bi bi-broadcast-pin"></i> Live driftpanel</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/portal/cps.html"><i class="bi bi-diagram-3"></i> Laddare</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link active" href="/instructions.html"><i class="bi bi-info-circle"></i> Instruktioner</a></li>
+          
+          <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin">
+            <a href="#" class="nav-link"
+               data-route-portal="/portal/rfid.html"
+               data-route-org="/org/rfid.html"
+               data-route-user="/user/index.html"><i class="bi bi-upc-scan"></i> RFID</a>
+          </li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin">
+            <a href="#" class="nav-link"
+               data-route-portal="/portal/add_user.html"
+               data-route-org="/org/add_user.html"
+               data-route-user="/user/index.html"><i class="bi bi-person-plus"></i> Användare</a>
+          </li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin">
+            <a class="nav-link" href="/orgs.html">
+              <i class="bi bi-building-gear"></i> Organisationer
+            </a>
+          </li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin">
+            <a class="nav-link" href="/portal/api_keys.html">
+              <i class="bi bi-code-square"></i> Integrations
+            </a>
+          </li>
+
+          <li class="nav-item"><span id="me-display" class="navbar-text small text-light opacity-75"></span></li>
+          <li class="nav-item"><button id="btnLogout" class="btn btn-outline-light btn-sm" type="button"><i class="bi bi-box-arrow-right"></i> Logga ut</button></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container my-4 app-shell">
+    <div id="alerts"></div>
+
+    <section class="page-header mb-4">
+      <div>
+        <h1 class="h3 m-0">Användarinstruktioner</h1>
+        <p class="page-subtitle">Steg-för-steg guide för att lägga till och hantera laddare i portalen.</p>
+      </div>
+    </section>
+
+    <div class="row g-4">
+      <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-1-circle"></i> Lägga till en ny laddare i portalen</h5>
+            <p>För att en laddare ska kunna kommunicera med TakoramaCharge-portalen måste den konfigureras med rätt WebSocket-endpoint.</p>
+            
+            <div class="bg-dark text-light p-3 rounded mb-3">
+              <code>ws://takoramcharge.se/ocpp/[CHARGE_POINT_ID]</code>
+            </div>
+            
+            <ul>
+              <li><strong>CHARGE_POINT_ID:</strong> Detta är det unika ID:t för laddaren (t.ex. serienumret).</li>
+              <li>Använd standardport 80 (HTTP/WS) eller se till att brandväggen tillåter utgående trafik på port 80.</li>
+              <li>När laddaren har anslutit för första gången kommer den att dyka upp i listan över <strong>Nya laddare</strong>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-2-circle"></i> Tilldela laddare till en organisation</h5>
+            <p>När en laddare är ansluten men inte tilldelad en organisation måste den kopplas till en organisation för att bli synlig för rätt användare.</p>
+            
+            <ol>
+              <li>Navigera till sidan <strong>Laddare</strong> i menyn.</li>
+              <li>Leta upp laddaren i listan (använd sökfunktionen om det behövs).</li>
+              <li>Klicka på knappen <strong><i class="bi bi-pencil"></i> Redigera</strong> vid den aktuella laddaren.</li>
+              <li>Välj önskad organisation i rullistan <strong>Organisation</strong>.</li>
+              <li>Klicka på <strong>Spara ändringar</strong>.</li>
+            </ol>
+            <p class="text-muted small"><em>Notera: Endast Portal-administratörer och Installatörer kan utföra denna åtgärd.</em></p>
+          </div>
+        </div>
+        
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-broadcast-pin"></i> Live-hantering</h5>
+            <p>Under <strong>Live driftpanel</strong> kan du se realtidsstatus för alla anslutna laddare, starta om dem eller skicka kommandon direkt via portalen.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm bg-primary text-white">
+          <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-info-square"></i> Teknisk Information</h5>
+            <p class="mb-1"><strong>WS Endpoint:</strong></p>
+            <p class="mb-3"><code>takoramcharge.se</code></p>
+            <p class="mb-1"><strong>Protokoll:</strong></p>
+            <p class="mb-3">OCPP 1.6J</p>
+            <hr>
+            <p class="small mb-0">Vid problem med anslutning, kontrollera att laddaren har internetåtkomst och att DNS kan slå upp takoramcharge.se.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="text-center text-muted small py-3"> TakoramaCharge &copy; 2024 </footer>
+
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/assets/ui-common.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Kräver portal_admin eller installer för att se denna sida
+      const me = await UI.initPage({ requiredRoles: ['portal_admin', 'admin', 'installer'] });
+      if (!me) return;
+    });
+  </script>
+</body>
+</html>

@@ -41,7 +41,7 @@
 
   function isProtectedRole(role){
     const r = String(role || '').trim().toLowerCase();
-    return r === 'portal_admin' || r === 'admin';
+    return r === 'portal_admin' || r === 'admin' || r === 'installer';
   }
 
   function toggleManualTagInput(){
@@ -138,17 +138,18 @@
     const rows=Object.entries(map||{}).map(([tag,u])=>{
       const name=u?.name || [u?.first_name,u?.last_name].filter(Boolean).join(' ') || tag;
       const alias=u?.rfid_alias || tag;
-      return { tag, alias, name, org:u?.org_id||'', user: u };
-    }).filter(r=>(!orgFilter || r.org===orgFilter) && (!q||r.name.toLowerCase().includes(q)||r.alias.toLowerCase().includes(q)||r.tag.toLowerCase().includes(q)||r.org.toLowerCase().includes(q)))
+      return { tag, alias, name, org:u?.org_id||'', role:u?.role||'user', user: u };
+    }).filter(r=>(!orgFilter || r.org===orgFilter) && (!q||r.name.toLowerCase().includes(q)||r.alias.toLowerCase().includes(q)||r.tag.toLowerCase().includes(q)||r.org.toLowerCase().includes(q)||r.role.toLowerCase().includes(q)))
       .sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
     const visibleRows = usersListExpanded ? rows : rows.slice(0, USER_LIST_PREVIEW_COUNT);
     updateCompactListUi('#usersListSummary', '#btnToggleUsersList', rows.length, visibleRows.length, 'användare', usersListExpanded);
-    if(!rows.length){ tbody.innerHTML=`<tr><td colspan="4" class="text-center text-muted">Inga användare.</td></tr>`; if(foot) foot.textContent=''; return; }
+    if(!rows.length){ tbody.innerHTML=`<tr><td colspan="5" class="text-center text-muted">Inga användare.</td></tr>`; if(foot) foot.textContent=''; return; }
     tbody.innerHTML=visibleRows.map(r=>`
       <tr>
         <td>${esc(r.name)}</td>
         <td><code>${esc(r.alias)}</code></td>
         <td><code>${esc(r.org)}</code></td>
+        <td><span class="badge ${r.role==='portal_admin'?'text-bg-danger':(r.role==='installer'?'text-bg-warning':'text-bg-secondary')}">${esc(r.role)}</span></td>
         <td class="text-end"><button class="btn btn-sm btn-outline-primary" data-edit="${esc(r.tag)}" type="button"><i class="bi bi-pencil"></i> Redigera</button> <button class="btn btn-sm btn-outline-danger" data-del="${esc(r.tag)}" type="button"><i class="bi bi-trash"></i> Ta bort</button></td>
       </tr>`).join('');
     if(foot) foot.textContent='';
@@ -208,7 +209,7 @@
 
     const rows=Object.entries(map||{}).map(([tag,u])=>{
       const name=u?.name || [u?.first_name,u?.last_name].filter(Boolean).join(' ') || tag;
-      return { tag, name, org:u?.org_id||'', email:u?.email||'', user:u };
+      return { tag, name, org:u?.org_id||'', email:u?.email||'', role:u?.role||'user', user:u };
     }).filter(r=> !orgFilter || r.org===orgFilter)
       .sort((a,b)=>a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
     const visibleRows = unassignedListExpanded ? rows : rows.slice(0, USER_LIST_PREVIEW_COUNT);
@@ -216,7 +217,7 @@
     if(badge) badge.textContent = rows.length || '';
     updateCompactListUi('#unassignedListSummary', '#btnToggleUnassignedList', rows.length, visibleRows.length, 'inaktiva användare', unassignedListExpanded);
     if(!rows.length){
-      tbody.innerHTML=`<tr><td colspan="4" class="text-center text-muted">Inga inaktiva användare.</td></tr>`;
+      tbody.innerHTML=`<tr><td colspan="5" class="text-center text-muted">Inga inaktiva användare.</td></tr>`;
       if(foot) foot.textContent=''; return;
     }
 
@@ -225,6 +226,7 @@
         <td>${esc(r.name)}</td>
         <td><small class="text-muted">${esc(r.email)}</small></td>
         <td><code>${esc(r.org)}</code></td>
+        <td><span class="badge ${r.role==='portal_admin'?'text-bg-danger':(r.role==='installer'?'text-bg-warning':'text-bg-secondary')}">${esc(r.role)}</span></td>
         <td class="text-end">
           <button class="btn btn-sm btn-outline-primary" data-edit-u="${esc(r.tag)}" type="button"><i class="bi bi-pencil"></i> Redigera</button>
           <button class="btn btn-sm btn-outline-danger" data-del-u="${esc(r.tag)}" type="button"><i class="bi bi-trash"></i> Ta bort</button>
@@ -267,8 +269,9 @@
   function normalizeRole(v){ const s=String(v||'').toLowerCase();
     if(s==='portal-admin'||s==='portal admin'||s==='admin') return 'portal_admin';
     if(s==='org-admin'||s==='org admin'||s==='organisation admin'||s==='organisations-admin') return 'org_admin';
+    if(s==='installer'||s==='installatör'||s==='inst') return 'installer';
     if(s==='användare'||s==='user') return 'user';
-    if(['portal_admin','org_admin','user'].includes(s)) return s;
+    if(['portal_admin','org_admin','installer','user'].includes(s)) return s;
     return 'user';
   }
 

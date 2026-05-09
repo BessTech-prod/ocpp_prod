@@ -21,10 +21,10 @@
       <div id="navMain" class="collapse navbar-collapse justify-content-end">
         <ul class="navbar-nav align-items-center gap-2">
           <li class="nav-item"><a class="nav-link js-go-dashboard" href="javascript:void(0)"><i class="bi bi-speedometer2"></i> Överblick</a></li>
-          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/portal/live_ops.html"><i class="bi bi-broadcast-pin"></i> Live driftpanel</a></li>
-          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/portal/cps.html"><i class="bi bi-diagram-3"></i> Laddare</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/installer/live_ops.html"><i class="bi bi-broadcast-pin"></i> Live driftpanel</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/installer/cps.html"><i class="bi bi-diagram-3"></i> Laddare</a></li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/instructions.html"><i class="bi bi-info-circle"></i> Instruktioner</a></li>
-          <li class="nav-item">
+          <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin">
             <a href="#" class="nav-link"
                data-route-portal="/portal/rfid.html"
                data-route-org="/org/rfid.html"
@@ -32,29 +32,29 @@
           </li>
 
           <!-- ROLL‑MEDVETNA LÄNKAR (gemensamma sidor) -->
-          <li class="nav-item">
+          <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin">
             <a href="#" class="nav-link"
                data-route-portal="/portal/add_user.html"
                data-route-org="/org/add_user.html"
                data-route-user="/user/index.html"><i class="bi bi-person-plus"></i> Användare</a>
           </li>
-          <li class="nav-item" data-visible-roles="portal_admin,admin,installer">
+          <li class="nav-item" data-visible-roles="portal_admin,admin">
   <a class="nav-link" href="/orgs.html">
     <i class="bi bi-building-gear"></i> Organisationer
   </a>
 </li>
-          <li class="nav-item" data-visible-roles="portal_admin,admin,installer">
+          <li class="nav-item" data-visible-roles="portal_admin,admin">
             <a class="nav-link" href="/portal/api_keys.html">
               <i class="bi bi-code-square"></i> Integrations
             </a>
           </li>
-          <li class="nav-item">
+          <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,user">
             <a href="#" class="nav-link"
                data-route-portal="/users_history.html"
                data-route-org="/org/history.html"
                data-route-user="/user/index.html"><i class="bi bi-clock-history"></i> Historik</a>
           </li>
-          <li class="nav-item">
+          <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,user">
             <a href="#" class="nav-link"
                data-route-portal="/my.html"
                data-route-org="/org/my.html"
@@ -117,6 +117,6 @@
   <!-- JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/assets/ui-common.js"></script>
-  <script src="/assets/portal_index.js?v=org_filter_3"></script>
+  <script src="/assets/installer_index.js?v=2"></script>
 </body>
 </html>

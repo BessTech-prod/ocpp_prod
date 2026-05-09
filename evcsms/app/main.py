@@ -256,6 +256,10 @@ def require_portal_admin(s=Depends(get_session)):
         raise HTTPException(403, "Portal admin required")
     return s
 
+def require_installer_or_higher(s=Depends(get_session)):
+    if (s.get("role") or "").lower() not in ("portal_admin", "admin", "installer"):
+        raise HTTPException(403, "Portal admin or installer required")
+    return s
 
 def require_org_admin_or_portal(s=Depends(get_session)):
     if (s.get("role") or "").lower() not in ("org_admin", "portal_admin", "admin"):
@@ -437,7 +441,10 @@ async def api_login(body: LoginBody, response: Response):
         raise HTTPException(401, "Felaktig e‑post/lösenord")
 
     role = (data.get("role") or "user").lower()
-    org_id = data.get("org_id") if role not in ("portal_admin", "admin") else None
+    if role not in ("portal_admin", "admin", "installer"):
+        org_id = data.get("org_id")
+    else:
+        org_id = None
 
     set_session_cookie(response, email=body.email.strip().lower(), role=role, org_id=org_id)
     return {"ok": True, "email": body.email}
@@ -485,7 +492,7 @@ async def api_me(session=Depends(require_auth)):
 async def api_orgs(session=Depends(require_auth)):
     orgs = load_orgs()
     role = session.get("role")
-    if role in ("portal_admin", "admin"):
+    if role in ("portal_admin", "admin", "installer"):
         return orgs
     oid = session.get("org_id")
     return {oid: orgs.get(oid)} if oid in orgs else {}
@@ -543,12 +550,11 @@ async def api_orgs_delete(org_id: str, force: bool = False, session=Depends(requ
 # CPS (CHARGE POINTS) API
 # =====================================================================
 @app.get("/api/cps/map")
-async def api_cps_map(session=Depends(require_portal_admin)):
+async def api_cps_map(session=Depends(require_installer_or_higher)):
     return load_cps_map()
 
-
 @app.post("/api/cps/map")
-async def api_cps_assign(body: CpAssignBody, session=Depends(require_portal_admin)):
+async def api_cps_assign(body: CpAssignBody, session=Depends(require_installer_or_higher)):
     ensure_default_org()
     cp_id = body.cp_id.strip()
     org_id = body.org_id.strip()
@@ -562,7 +568,7 @@ async def api_cps_assign(body: CpAssignBody, session=Depends(require_portal_admi
 
 
 @app.delete("/api/cps/map")
-async def api_cps_unassign(cp_id: str = Query(...), session=Depends(require_portal_admin)):
+async def api_cps_unassign(cp_id: str = Query(...), session=Depends(require_installer_or_higher)):
     cps = load_cps_map()
     if cp_id in cps:
         cps.pop(cp_id)
@@ -573,7 +579,7 @@ async def api_cps_unassign(cp_id: str = Query(...), session=Depends(require_port
 def allowed_cps_for_session(session: dict):
     """Portal_admin → alla CP. Org_admin → CP i egna orgen."""
     role = session.get("role")
-    if role in ("portal_admin", "admin"):
+    if role in ("portal_admin", "admin", "installer"):
         return None
     oid = session.get("org_id")
     cps = load_cps_map()
@@ -607,7 +613,7 @@ async def api_users_map(session=Depends(require_auth)):
     users = load_users_map()
     role = session.get("role")
 
-    if role in ("portal_admin", "admin"):
+    if role in ("portal_admin", "admin", "installer"):
         return users
     elif role == "org_admin":
         oid = session.get("org_id")
@@ -642,10 +648,10 @@ async def api_users_map_add(body: UserMapBody, req: Request, session=Depends(req
         raise HTTPException(400, "name eller first/last_name krävs")
 
     role = (body.role or "user").lower()
-    if role not in ("user", "org_admin", "portal_admin"):
+    if role not in ("user", "org_admin", "portal_admin", "installer"):
         raise HTTPException(400, "Ogiltig roll")
 
-    # Portal-admin kan välja org_id. Org_admin är låst till sin egen org.
+    # Portal-admin och installer kan välja org_id.
     if session.get("role") in ("portal_admin", "admin"):
         org_id = (body.org_id or raw.get("org_id") or "").strip()
         if not org_id:
@@ -654,8 +660,8 @@ async def api_users_map_add(body: UserMapBody, req: Request, session=Depends(req
             raise HTTPException(400, "Okänd organisation")
     else:
         org_id = session.get("org_id")
-        if role == "portal_admin":
-            raise HTTPException(403, "org_admin får inte skapa portal_admin")
+        if role in ("portal_admin", "installer"):
+            raise HTTPException(403, f"org_admin får inte skapa {role}")
 
     # E‑post måste vara unik per tag
     for t, u in users.items():
@@ -713,7 +719,7 @@ async def api_users_map_del(tag: str = Query(...), session=Depends(require_org_a
 # =====================================================================
 def _allowed_tags_for_session(session: dict, users_map: dict) -> Optional[Set[str]]:
     role = session.get("role")
-    if role in ("portal_admin", "admin"):
+    if role in ("portal_admin", "admin", "installer"):
         return None
     if role == "org_admin":
         oid = session.get("org_id")

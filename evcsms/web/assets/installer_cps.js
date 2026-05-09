@@ -131,7 +131,7 @@
 
   async function refresh(){
     const [cpsResp, stResp, mapRaw] = await Promise.all([
-      getJSON(API.cps), getJSON(API.status), getJSON(API.map).catch(() => ({}))
+      getJSON(API.cps), getJSON(API.status), getJSON(API.orgs), getJSON(API.map).catch(() => ({}))
     ]);
     const allCps = unionCpList(cpsResp, stResp);
     const map = normalizeMap(mapRaw);
@@ -146,7 +146,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', async ()=>{
-    const me = await UI.initPage({ requiredRoles:['portal_admin','admin'] }); if(!me) return;
+    const me = await UI.initPage({ requiredRoles:['portal_admin','admin','installer'] }); if(!me) return;
     await initFormLists();
     await refresh();
 

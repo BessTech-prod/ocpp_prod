@@ -1,11 +1,33 @@
 {
+<<<<<<< HEAD
   "acc834f25efd84cad771e4e7cde66e2fa0bca73a091c5890580acb6b1ba3b3cf": {
     "org_id": "Takorama_Storås",
     "created_at": "2026-05-07T19:29:18.310897+00:00",
+=======
+  "773d1eef6d024e3dc5baa45e8a30becd7707850696a4e5a2ccf891d11da57a18": {
+    "org_id": "Takorama_Storås",
+    "created_at": "2026-05-07T16:05:13.015529+00:00",
+    "last_used": null,
+    "rate_limit": 120,
+    "active": true,
+    "ip_whitelist": []
+  },
+  "29064e7ac2cd5690d681f06542a986aea91af783e5f3d925d6a9d1ae9f659db1": {
+    "org_id": "kaefer_std",
+    "created_at": "2026-05-07T18:42:32.815725+00:00",
+    "last_used": null,
+    "rate_limit": 1000,
+    "active": true
+  },
+  "8aa3f491053d56e7a662b97970c2e9e49b516786b5a8794e2e4f4780cc9dfd4f": {
+    "org_id": "Takorama_Storås",
+    "created_at": "2026-05-08T12:41:55.275741+00:00",
+>>>>>>> d985dbddc2fa58363b0b9c64fae8519727c9de4f
     "last_used": null,
     "rate_limit": 120,
     "ip_whitelist": [],
     "active": true
+<<<<<<< HEAD
   },
   "f4d0d52b40f7959b6986c1b39a8a3539c60b9ef1052b9c529d9ea688896d6c0b": {
     "org_id": "Takorama_Storås",
@@ -14,5 +36,7 @@
     "rate_limit": 1000,
     "ip_whitelist": [],
     "active": true
+=======
+>>>>>>> d985dbddc2fa58363b0b9c64fae8519727c9de4f
   }
 }
