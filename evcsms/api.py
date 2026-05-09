@@ -2015,16 +2015,28 @@ async def v1_get_energy(
     # Load data
     txs = load_transactions()
     cps_map = normalize_cps_map(load_cps_map())
+    rfids_map = load_rfids_map()
     orgs = load_orgs()
     
     # Aggregate data
     aggregates: Dict[str, Dict] = {}
     
     for tx in txs:
-        # Check org - prioritize tx record, fallback to CP config
+        # Check org - prioritize tx record, fallback to CP config, fallback to RFID ownership
         cp_id = tx.get("charge_point", "unknown")
-        tx_org = tx.get("org_id") or cps_map.get(cp_id, {}).get("org_id", "default")
+        id_tag = normalize_tag(tx.get("id_tag", ""))
         
+        tx_org = tx.get("org_id") or cps_map.get(cp_id, {}).get("org_id")
+        
+        # If still not found, check if the RFID used in the transaction belongs to the org
+        if not tx_org and id_tag:
+            tag_info = rfids_map.get(id_tag, {})
+            if (tag_info.get("org_id") or "default") == auth_org_id:
+                tx_org = auth_org_id
+        
+        if not tx_org:
+            tx_org = "default"
+
         if tx_org != auth_org_id:
             continue
         
@@ -2333,8 +2345,21 @@ async def external_get_energy(
     aggregates: Dict[str, Dict] = {}
     
     for tx in txs:
-        # Check org
-        tx_org = tx.get("org_id", "default")
+        # Check org - prioritize tx record, fallback to CP config, fallback to RFID ownership
+        cp_id = tx.get("charge_point", "unknown")
+        id_tag = normalize_tag(tx.get("id_tag", ""))
+        
+        tx_org = tx.get("org_id") or cps_map.get(cp_id, {}).get("org_id")
+        
+        # If still not found, check if the RFID used in the transaction belongs to the org
+        if not tx_org and id_tag:
+            tag_info = rfids_map.get(id_tag, {})
+            if (tag_info.get("org_id") or "default") == org_id:
+                tx_org = org_id
+
+        if not tx_org:
+            tx_org = "default"
+
         if tx_org != org_id:
             continue
         
