@@ -29,6 +29,7 @@
     btnCopyUrlChargers: document.getElementById("btnCopyUrlChargers"),
     urlEnergy: document.getElementById("urlEnergy"),
     btnCopyUrlEnergy: document.getElementById("btnCopyUrlEnergy"),
+    periodSelect: document.getElementById("periodSelect"),
     ipWhitelist: document.getElementById("ipWhitelist"),
     specWhitelist: document.getElementById("specWhitelist"),
     newIpInput: document.getElementById("newIpInput"),
@@ -120,7 +121,22 @@
     const keyPlaceholder = k.prefix + "...";
     const encodedKey = encodeURIComponent(keyPlaceholder);
     elements.urlChargers.value = `${base}/api/v1/chargers?api_key=${encodedKey}`;
-    elements.urlEnergy.value = `${base}/api/v1/energy?api_key=${encodedKey}&group_by=user&period=1m`;
+    
+    const updateEnergyUrl = () => {
+      const period = elements.periodSelect.value;
+      elements.urlEnergy.value = `${base}/api/v1/energy?api_key=${encodedKey}&group_by=user&period=${period}`;
+    };
+    
+    // Reset period select to default 1m
+    elements.periodSelect.value = "1m";
+    updateEnergyUrl();
+
+    // Remove old listeners to avoid multiple attachments
+    const newPeriodSelect = elements.periodSelect.cloneNode(true);
+    elements.periodSelect.parentNode.replaceChild(newPeriodSelect, elements.periodSelect);
+    elements.periodSelect = newPeriodSelect;
+    
+    elements.periodSelect.addEventListener("change", updateEnergyUrl);
 
     // Toggle buttons
     if (k.active) {

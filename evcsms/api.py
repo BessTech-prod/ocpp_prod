@@ -1973,7 +1973,7 @@ async def v1_get_energy(
     Query Parameters:
     - api_key: Your API key (required)
     - group_by: "user", "connector", or "charger"
-    - period: "24h" (last 24 hours) or "Xm" (number of months, e.g. "1m", "3m")
+    - period: "24h" (last 24 hours) or "Xm" (number of months, e.g. "1m", "2m", "3m", "6m")
     - org_id: (Optional) Verify the request is for this specific organization
     """
     if group_by not in ("user", "connector", "charger"):
@@ -1987,7 +1987,7 @@ async def v1_get_energy(
     if not is_valid_period:
         raise HTTPException(400, json.dumps({
             "error": "invalid_parameter",
-            "message": "period must be '24h' or a number of months (e.g. '1m', '3m')",
+            "message": "period must be '24h' or a number of months (e.g. '1m', '2m', '3m', '6m')",
             "code": 400
         }), headers={"Content-Type": "application/json"})
     
@@ -2280,7 +2280,7 @@ async def external_get_energy(
     Query Parameters:
     - api_key: Your API key (required)
     - group_by: "user" or "connector"
-    - period: "24h" (last 24 hours) or "Xm" (number of months, e.g. "1m", "3m")
+    - period: "24h" (last 24 hours) or "Xm" (number of months, e.g. "1m", "2m", "3m", "6m")
     
     Response format (summary):
     {
@@ -2305,7 +2305,7 @@ async def external_get_energy(
     if not is_valid_period:
         raise HTTPException(400, json.dumps({
             "error": "invalid_parameter",
-            "message": "period must be '24h' or a number of months (e.g. '1m', '3m')",
+            "message": "period must be '24h' or a number of months (e.g. '1m', '2m', '3m', '6m')",
             "code": 400
         }), headers={"Content-Type": "application/json"})
     

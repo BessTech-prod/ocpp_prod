@@ -22,12 +22,12 @@ The third party must include the API key in every request as a query parameter:
 ### Data Polling Strategy (Recommended)
 Since the primary use case is billing and analytics, real-time polling is not required.
 *   **Hourly Sync**: We recommend the third party pools data once per hour.
-*   **Batch Retrieval**: Use the `/api/v1/energy` endpoint with `period=24h` or `period=1m` to get accumulated consumption.
+*   **Batch Retrieval**: Use the `/api/v1/energy` endpoint with `period=24h`, `period=1m`, or `period=3m` to get accumulated consumption.
 
 ## 3. Implementation Scenarios
 
-### Scenario A: Monthly Billing
-1.  **Call**: `GET /api/v1/energy?group_by=user&period=1m&api_key=...`
+### Scenario A: Monthly/Multi-Month Billing
+1.  **Call**: `GET /api/v1/energy?group_by=user&period=1m&api_key=...` (or `period=3m` for quarterly)
 2.  **Process**:
     *   Iterate through the `groups`.
     *   Each group contains a `user_email` and `total_kwh`.

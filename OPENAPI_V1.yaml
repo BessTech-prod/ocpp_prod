@@ -1,0 +1,222 @@
+openapi: 3.0.0
+info:
+  title: TakoramaCharge External API
+  version: "1.0"
+  description: |
+    External API for TakoramaCharge CSMS, designed for integration with third-party billing, 
+    analytics, and monitoring systems.
+
+servers:
+  - url: https://www.takoramacharge.se/api/v1
+    description: Production Server
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: query
+      name: api_key
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: integer
+    Charger:
+      type: object
+      properties:
+        cp_id:
+          type: string
+        alias:
+          type: string
+        org_id:
+          type: string
+        org_name:
+          type: string
+        current_status:
+          type: string
+          enum: [Available, Charging, Occupied, Faulted, Offline]
+        last_updated:
+          type: string
+          format: date-time
+          nullable: true
+        total_kwh_lifetime:
+          type: number
+        session_count:
+          type: integer
+        connector_count:
+          type: integer
+        location:
+          type: string
+          nullable: true
+        owner:
+          type: string
+          nullable: true
+    EnergyGroup:
+      type: object
+      properties:
+        group_key:
+          type: string
+        display:
+          type: string
+        total_kwh:
+          type: number
+        session_count:
+          type: integer
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
+    Session:
+      type: object
+      properties:
+        start_time:
+          type: string
+          format: date-time
+        stop_time:
+          type: string
+          format: date-time
+        energy_kwh:
+          type: number
+        duration_minutes:
+          type: number
+          nullable: true
+        user_name:
+          type: string
+        user_email:
+          type: string
+          nullable: true
+        cp_id:
+          type: string
+        connector_id:
+          type: integer
+        cp_alias:
+          type: string
+        meter_start:
+          type: number
+        meter_stop:
+          type: number
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /chargers:
+    get:
+      summary: Get Chargers
+      description: Returns a list of all chargers belonging to the authenticated organization.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  org_id:
+                    type: string
+                  org_name:
+                    type: string
+                  generated_at:
+                    type: string
+                    format: date-time
+                  chargers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Charger'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /energy:
+    get:
+      summary: Get Energy Consumption
+      description: Returns aggregated energy consumption and detailed session data.
+      parameters:
+        - name: group_by
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [user, connector, charger]
+          description: How to group the data.
+        - name: period
+          in: query
+          required: false
+          schema:
+            type: string
+            default: 24h
+            pattern: '^(24h|[0-9]+m)$'
+          description: |
+            Time period for the report. 
+            - '24h': Last 24 hours.
+            - 'Xm': Last X months (e.g., '1m', '2m', '3m', '6m').
+        - name: org_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional organization ID validation.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  org_id:
+                    type: string
+                  org_name:
+                    type: string
+                  period:
+                    type: string
+                  group_by:
+                    type: string
+                  generated_at:
+                    type: string
+                    format: date-time
+                  groups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EnergyGroup'
+                  count:
+                    type: integer
+                  totals:
+                    type: object
+                    properties:
+                      total_kwh:
+                        type: number
+                      total_sessions:
+                        type: integer
+                  pagination:
+                    type: object
+                    properties:
+                      limit:
+                        type: integer
+                      returned_sessions:
+                        type: integer
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

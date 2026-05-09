@@ -5,6 +5,9 @@ This document describes the external API available for third-party billing and a
 ## Base URL
 The base URL for all v1 endpoints is `/api/v1`.
 
+## Machine-Readable Specification
+A machine-readable OpenAPI 3.0 specification is available in the root of this project: `OPENAPI_V1.yaml`. This can be imported into tools like Postman, Swagger UI, or AI-powered IDEs to automatically generate client code or testing suites.
+
 ## Authentication
 All requests must include an `api_key` query parameter. Each API key is bound to a specific organization and grants access to that organization's data only.
 
@@ -79,7 +82,7 @@ Returns aggregated energy consumption and detailed session data for the organiza
 **Parameters:**
 - `api_key` (required): Your API key.
 - `group_by` (required): How to group the data. One of: `user`, `connector`, `charger`.
-- `period` (optional): Time period for the report. One of: `24h` (default), `1m`, `2m`, etc. (Xm for X months).
+- `period` (optional): Time period for the report. One of: `24h` (default), `1m`, `2m`, `3m`, `6m`, etc. (Xm for X months).
 - `org_id` (optional): If provided, the API will verify that the API key is authorized for this specific organization.
 
 **Response Structure:**

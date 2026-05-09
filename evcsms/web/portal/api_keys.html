@@ -184,7 +184,18 @@
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label small fw-bold">API-URL (Energi):</label>
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <label class="form-label small fw-bold mb-0">API-URL (Energi):</label>
+              <div class="d-flex align-items-center gap-1">
+                <span class="small text-muted" style="font-size: 0.7rem;">Period:</span>
+                <select id="periodSelect" class="form-select form-select-sm py-0" style="font-size: 0.75rem; width: auto;">
+                  <option value="1m" selected>1 månad</option>
+                  <option value="2m">2 månader</option>
+                  <option value="3m">3 månader</option>
+                  <option value="6m">6 månader</option>
+                </select>
+              </div>
+            </div>
             <div class="input-group input-group-sm">
               <input type="text" id="urlEnergy" class="form-control font-monospace" readonly>
               <button class="btn btn-outline-secondary" type="button" id="btnCopyUrlEnergy"><i class="bi bi-copy"></i></button>
