@@ -161,6 +161,7 @@ paths:
             Time period for the report. 
             - '24h': Last 24 hours.
             - 'Xm': Last X months (e.g., '1m', '2m', '3m', '6m').
+            The system now supports up to 50,000 total records to accommodate long-term history.
         - name: org_id
           in: query
           required: false
@@ -206,8 +207,13 @@ paths:
                     properties:
                       limit:
                         type: integer
+                        description: The total maximum number of records across all groups (current limit: 50,000).
                       returned_sessions:
                         type: integer
+                        description: The total number of session records included in this response.
+                      info:
+                        type: string
+                        description: Additional information about pagination and per-group limits.
         '400':
           description: Invalid parameters
           content:

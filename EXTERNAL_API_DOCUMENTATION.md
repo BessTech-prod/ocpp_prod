@@ -79,6 +79,8 @@ Returns a list of all chargers belonging to the authenticated organization, incl
 ### 2. Get Energy Consumption (`GET /api/v1/energy`)
 Returns aggregated energy consumption and detailed session data for the organization.
 
+**Improved Accuracy:** The API now uses RFID ownership to match historical transactions, ensuring data consistency even if charger assignments have changed over time.
+
 **Parameters:**
 - `api_key` (required): Your API key.
 - `group_by` (required): How to group the data. One of: `user`, `connector`, `charger`.
@@ -123,13 +125,14 @@ Returns aggregated energy consumption and detailed session data for the organiza
     "total_sessions": int
   },
   "pagination": {
-    "limit": 10000,
-    "returned_sessions": int
+    "limit": 50000,
+    "returned_sessions": int,
+    "info": "string"
   }
 }
 ```
 
-**Note on Data Volume:** The response is limited to a total of 10,000 session records across all groups. Groups are sorted by total energy consumption descending.
+**Note on Data Volume:** The response is limited to a total of **50,000 session records** across all groups. Individual groups (e.g., a specific user) are limited to the **top 1,000 sessions** for the requested period. Groups are sorted by total energy consumption descending.
 
 ---
 
