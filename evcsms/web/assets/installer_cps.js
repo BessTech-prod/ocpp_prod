@@ -4,6 +4,7 @@
   const $$ = (s)=>document.querySelectorAll(s);
   const esc= (s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const API = { cps:'/api/cps', status:'/api/status', orgs:'/api/orgs', map:'/api/cps/map' };
+  const state = { orgs: {}, lastMap: {} };
 
   function alertBox(msg,kind='danger',t=4500){
     const el=$('#page-alerts'); if(!el)return;
@@ -49,17 +50,31 @@
 
   function renderTable(map){
     const tbody = $('#cps-table tbody'); if(!tbody) return;
-    const rows = Object.entries(map||{}).sort((a,b)=> a[0].localeCompare(b[0])).map(([cp,meta])=>`
+    const filter = $('#tableFilterOrg')?.value || '';
+    
+    let entries = Object.entries(map||{}).sort((a,b)=> a[0].localeCompare(b[0]));
+    
+    if (filter === '__unassigned__') {
+      entries = entries.filter(([cp, meta]) => !meta.org_id || meta.org_id === 'default');
+    } else if (filter) {
+      entries = entries.filter(([cp, meta]) => meta.org_id === filter);
+    }
+
+    const rows = entries.map(([cp,meta])=>{
+      const isUnassigned = !meta.org_id || meta.org_id === 'default';
+      const orgDisplay = isUnassigned ? '<span class="badge bg-warning text-dark">Oallokerad</span>' : (state.orgs[meta.org_id]?.name || meta.org_id);
+      return `
       <tr>
         <td>${esc(meta.alias || cp)}</td>
         <td><code>${esc(cp)}</code></td>
-        <td><code>${esc(meta.org_id || 'default')}</code></td>
+        <td>${orgDisplay}</td>
         <td class="text-end">
           <button class="btn btn-sm btn-outline-primary" data-edit="${esc(cp)}" type="button"><i class="bi bi-pencil"></i> Redigera</button>
           <button class="btn btn-sm btn-outline-danger" data-unassign="${esc(cp)}" type="button"><i class="bi bi-trash"></i> Ta bort</button>
         </td>
-      </tr>`).join('');
-    tbody.innerHTML = rows || `<tr><td colspan="4" class="text-center text-muted">Ingen mappning ännu.</td></tr>`;
+      </tr>`;
+    }).join('');
+    tbody.innerHTML = rows || `<tr><td colspan="4" class="text-center text-muted">Inga laddare hittades för valt filter.</td></tr>`;
 
     // Handle edit buttons
     $$('#cps-table button[data-edit]').forEach(btn=>{
@@ -96,24 +111,48 @@
     const [cpsResp, stResp, orgs, mapRaw] = await Promise.all([
       getJSON(API.cps), getJSON(API.status), getJSON(API.orgs), getJSON(API.map).catch(() => ({}))
     ]);
+    state.orgs = orgs;
     const cps = unionCpList(cpsResp, stResp);
     const map = normalizeMap(mapRaw);
-    $('#cpPick').innerHTML  = cps.map(cp => {
+    $('#cpPick').innerHTML  = `<option value="">-- Välj en laddare --</option>` + cps.map(cp => {
       const alias = map?.[cp]?.alias || cp;
       return `<option value="${esc(cp)}">${esc(alias)} (${esc(cp)})</option>`;
     }).join('');
-    $('#orgPick').innerHTML = Object.entries(orgs).map(([id, o]) => `<option value="${esc(id)}">${esc(o?.name||id)} (${esc(id)})</option>`).join('');
+    
+    const orgOptions = Object.entries(orgs).map(([id, o]) => `<option value="${esc(id)}">${esc(o?.name||id)} (${esc(id)})</option>`).join('');
+    $('#orgPick').innerHTML = `<option value="">-- Välj organisation --</option>` + orgOptions;
+    
+    const filterEl = $('#tableFilterOrg');
+    if (filterEl) {
+      filterEl.innerHTML = `<option value="">Alla organisationer</option>
+                            <option value="__unassigned__">Oallokerade laddare</option>` + orgOptions;
+    }
   }
 
   async function refresh(){
-    const map = normalizeMap(await getJSON(API.map));
-    renderTable(map);
+    const [cpsResp, stResp, mapRaw] = await Promise.all([
+      getJSON(API.cps), getJSON(API.status), getJSON(API.orgs), getJSON(API.map).catch(() => ({}))
+    ]);
+    const allCps = unionCpList(cpsResp, stResp);
+    const map = normalizeMap(mapRaw);
+    
+    const fullMap = {};
+    allCps.forEach(cp => {
+      fullMap[cp] = map[cp] || { org_id: null, alias: cp };
+    });
+    
+    state.lastMap = fullMap;
+    renderTable(fullMap);
   }
 
   document.addEventListener('DOMContentLoaded', async ()=>{
     const me = await UI.initPage({ requiredRoles:['portal_admin','admin','installer'] }); if(!me) return;
     await initFormLists();
     await refresh();
+
+    $('#tableFilterOrg')?.addEventListener('change', () => {
+      renderTable(state.lastMap);
+    });
 
     // Cancel button handler
     $('#btnCancel')?.addEventListener('click', ()=>{
