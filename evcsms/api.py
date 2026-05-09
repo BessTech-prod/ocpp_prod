@@ -2116,7 +2116,7 @@ async def v1_get_energy(
     # Build response
     groups = []
     total_sessions_in_response = 0
-    MAX_RECORDS = 10000
+    MAX_RECORDS = 50000
     
     # Sort aggregates by energy (descending)
     sorted_groups_items = sorted(aggregates.items(), key=lambda x: x[1]["total_kwh"], reverse=True)
@@ -2433,7 +2433,7 @@ async def external_get_energy(
             "display": group_data["display"],
             "total_kwh": round(group_data["total_kwh"], 3),
             "session_count": group_data["session_count"],
-            "sessions": group_data["sessions"][:10]  # Top 10 sessions
+            "sessions": group_data["sessions"][:1000]  # Increased to 1000 sessions per group
         })
     
     # Sort by energy (descending)
@@ -2458,7 +2458,8 @@ async def external_get_energy(
         },
         "pagination": {
             "limit": 10000,
-            "returned": len(groups)
+            "returned": len(groups),
+            "info": "Each group limited to 1000 sessions"
         }
     }
 
