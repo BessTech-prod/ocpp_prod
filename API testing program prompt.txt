@@ -1,0 +1,64 @@
+Act as a Senior Full-Stack Developer. Your task is to build a modern, locally-hosted Web API Testing Tool specifically designed to interact with the TakoramaCharge CSMS and other generic REST APIs.
+
+### Technical Requirements
+1. **Tech Stack**: Use a modern framework of your choice (e.g., Python/FastAPI with Jinja2, Node.js/Express, or a simple React/Vue SPA).
+2. **Core Functionality**:
+    - Ability to send GET and POST requests.
+    - Header and Query parameter management.
+    - Response viewing with JSON syntax highlighting.
+    - **Presets System**: A dropdown or sidebar to quickly load pre-defined configurations for specific endpoints.
+
+### TakoramaCharge Specific Presets
+Integrate the following presets for the TakoramaCharge system:
+
+#### 1. External API v1 (Monitoring & Analytics)
+- **Base URL**: `https://www.takoramacharge.se/api/v1`
+- **Auth**: Query parameter `api_key` (Required).
+- **Endpoint: Get Chargers**
+  - Method: `GET`
+  - Path: `/chargers`
+  - Description: Returns a list of all chargers, their status, and lifetime metrics.
+- **Endpoint: Get Energy Data**
+  - Method: `GET`
+  - Path: `/energy`
+  - Required Params: `group_by` (Options: `user`, `charger`, or `connector`).
+  - Optional Params: `period` (Options: `24h`, `1m`, `3m`, etc. - use `Xm` for X months), `org_id`.
+
+#### 2. Command API (Remote Operations)
+- **Endpoint**: `POST /api/portal/ocpp/command`
+- **Headers**: Session-based auth (Cookies) or relevant authentication headers used by the portal.
+- **Payload Structure**:
+  ```json
+  {
+    "cp_id": "charger_id_here",
+    "command": "command_name",
+    "payload": {}
+  }
+  ```
+- **Command Presets**:
+  - `reset`: Payload: `{"type": "Soft"}` or `{"type": "Hard"}`.
+  - `remote_start_transaction`: Payload: `{"idTag": "...", "connectorId": 1}`.
+  - `remote_stop_transaction`: Payload: `{"transactionId": 123}`.
+  - `unlock_connector`: Payload: `{"connectorId": 1}`.
+  - `change_availability`: Payload: `{"connectorId": 1, "type": "Operative"}`.
+  - `trigger_message`: Payload: `{"requestedMessage": "BootNotification"}`.
+  - `get_configuration`: Payload: `{"key": ["HeartbeatInterval"]}`.
+
+### UI/UX & Aesthetics
+The application MUST strictly follow the TakoramaCharge portal aesthetics:
+1. **Color Palette**:
+   - **Primary Gradient**: `linear-gradient(135deg, #A30060 0%, #6B21A8 50%, #1E1B4B 100%)` (Raspberry to Indigo).
+   - **Shell Background**: Deep Blue-Purple (`#1E1B4B`).
+   - **Accent Color**: Raspberry (`#A30060`).
+   - **Secondary Color**: Violet/Purple (`#6B21A8`).
+2. **Design Elements**:
+   - **Rounded Corners**: Cards and buttons should have a radius of `1.05rem`.
+   - **Shadows**: Use deep, subtle shadows for panels: `box-shadow: 0 10px 28px rgba(15, 23, 42, .06)`.
+   - **Typography**: Clean, sans-serif font (similar to Bootstrap defaults).
+3. **Layout**:
+   - A dark top navigation bar featuring the Takorama gradient.
+   - A clean "App Shell" containing the request builder and results panel.
+   - Use cards to group functional areas (e.g., Request Configuration, Presets, Response).
+
+### Deliverables
+Provide the complete source code, a `requirements.txt` or `package.json`, and clear instructions on how to launch the tool locally.
