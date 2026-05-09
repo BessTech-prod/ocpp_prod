@@ -62,7 +62,7 @@
 
     const rows = entries.map(([cp,meta])=>{
       const isUnassigned = !meta.org_id || meta.org_id === 'default';
-      const orgDisplay = isUnassigned ? '<span class="badge bg-warning text-dark">Oallokerad</span>' : (state.orgs[meta.org_id]?.name || meta.org_id);
+      const orgDisplay = isUnassigned ? '<span class="badge bg-warning text-dark">Ny</span>' : (state.orgs[meta.org_id]?.name || meta.org_id);
       return `
       <tr>
         <td>${esc(meta.alias || cp)}</td>
@@ -125,7 +125,7 @@
     const filterEl = $('#tableFilterOrg');
     if (filterEl) {
       filterEl.innerHTML = `<option value="">Alla organisationer</option>
-                            <option value="__unassigned__">Oallokerade laddare</option>` + orgOptions;
+                            <option value="__unassigned__">Nya laddare</option>` + orgOptions;
     }
   }
 
