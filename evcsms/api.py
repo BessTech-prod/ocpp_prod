@@ -106,8 +106,11 @@ async def wait_for_redis(retries: int = 15, delay_seconds: float = 2.0):
 # =====================================================================
 def load_json(path: Path, default):
     try:
+        if not path.exists():
+            return default
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to load JSON from {path}: {e}")
         return default
 
 def save_json(path: Path, data):
