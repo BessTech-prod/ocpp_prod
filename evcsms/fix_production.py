@@ -3,6 +3,7 @@ import os
 import hashlib
 import base64
 import hmac
+import re
 from pathlib import Path
 
 def _b64(b: bytes) -> str:
@@ -17,104 +18,135 @@ def hash_password(password: str):
     dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 200_000, 32)
     return _b64(salt), _b64(dk)
 
-def fix():
-    # Try multiple common paths for users.json on the server
-    paths = [
-        Path("evcsms/config/users.json"),
-        Path("config/users.json"),
-        Path("/data/config/users.json"),
-        Path("~/ocpp_prod/evcsms/config/users.json").expanduser()
-    ]
+def clean_content(content):
+    lines = content.splitlines()
+    new_lines = []
+    in_ours = False
+    in_theirs = False
     
-    found_path = None
-    for p in paths:
-        if p.exists():
-            found_path = p
-            break
+    for line in lines:
+        trimmed = line.strip()
+        if not trimmed:
+            new_lines.append(line)
+            continue
+
+        # Conflict markers
+        if trimmed.startswith('<<<<<<<'):
+            in_ours = True
+            continue
+        if trimmed.startswith('======='):
+            in_ours = False
+            in_theirs = True
+            continue
+        if trimmed.startswith('>>>>>>>'):
+            in_theirs = False
+            continue
             
-    if not found_path:
-        print("❌ Could not find users.json in common locations.")
+        if in_theirs:
+            continue
+        
+        # Garbage filter: standalone hex hashes (often 7-40 chars) with no JSON syntax
+        if re.match(r'^[0-9a-f]{7,40}$', trimmed) and not any(c in line for c in '{}:,"[]'):
+            print(f"  🗑️ Filtering garbage line: {trimmed}")
+            continue
+            
+        new_lines.append(line)
+    return "\n".join(new_lines)
+
+def heal_json(content):
+    # Try to parse
+    try:
+        return json.loads(content), content
+    except json.JSONDecodeError as e:
+        print(f"  ❌ JSON Error: {e}")
+        lines = content.splitlines()
+        
+        # Aggressive cleaning: remove the line with the error if it looks like garbage
+        err_line_idx = e.lineno - 1
+        if 0 <= err_line_idx < len(lines):
+            bad_line = lines[err_line_idx].strip()
+            # If it doesn't look like JSON (no quotes, no braces, no colon)
+            if bad_line and not any(c in bad_line for c in '{}:,"[]'):
+                print(f"  ⚠️ Removing likely garbage at line {e.lineno}: {bad_line}")
+                lines.pop(err_line_idx)
+                content = "\n".join(lines)
+                try:
+                    return json.loads(content), content
+                except: pass
+
+        # Missing comma fix
+        new_lines = []
+        for i in range(len(lines)-1):
+            curr = lines[i].rstrip()
+            nxt = lines[i+1].lstrip()
+            if (curr.endswith('}') or curr.endswith('"') or (curr and curr[-1].isdigit())) and nxt.startswith('"') and not curr.endswith(','):
+                 new_lines.append(lines[i].rstrip() + ",")
+            else:
+                 new_lines.append(lines[i])
+        new_lines.append(lines[-1])
+        content = "\n".join(new_lines)
+        
+        try:
+            return json.loads(content), content
+        except Exception as e2:
+            return None, content
+
+def fix():
+    config_dir = None
+    possible_dirs = [
+        Path("config"),
+        Path("evcsms/config"),
+        Path("~/ocpp_prod/evcsms/config").expanduser()
+    ]
+    for d in possible_dirs:
+        if d.exists() and d.is_dir():
+            config_dir = d
+            break
+    
+    if not config_dir:
+        print("❌ Could not find config directory.")
         return
 
-    print(f"✅ Found users.json at: {found_path}")
+    print(f"✅ Found config directory at: {config_dir}")
+    files = ["users.json", "api_keys.json", "auth_tags.json", "rfids.json"]
     
-    try:
-        content = found_path.read_text(encoding="utf-8")
-        if "<<<<<<" in content:
-            print("⚠️ Conflict markers found! Attempting to clean them...")
-            import re
-            # Keep "ours" (local production data)
-            content = re.sub(r'<<<<<<<.*?[\n\r](.*?)=======.*?>>>>>>>.*?\n?', r'\1', content, flags=re.DOTALL)
-            found_path.write_text(content, encoding="utf-8")
-            print("✅ Conflict markers removed.")
-
+    for filename in files:
+        p = config_dir / filename
+        if not p.exists():
+            continue
+        
+        print(f"🔍 Checking {filename}...")
         try:
-            data = json.loads(content)
-        except json.JSONDecodeError as e:
-            print(f"❌ JSON Decode Error: {e}")
-            lines = content.splitlines()
-            start = max(0, e.lineno - 5)
-            end = min(len(lines), e.lineno + 5)
-            print("\nContext around error:")
-            for i in range(start, end):
-                prefix = ">>> " if i + 1 == e.lineno else "    "
-                print(f"{prefix}{i+1}: {lines[i]}")
+            content = p.read_text(encoding="utf-8")
+            # 1. Clean conflict markers and garbage
+            cleaned = clean_content(content)
+            # 2. Try to parse and heal
+            data, final_content = heal_json(cleaned)
             
-            # Attempt a simple fix: add missing commas between lines that look like they need them
-            print("\nAttempting automated 'missing comma' fix...")
-            new_lines = []
-            for i in range(len(lines)-1):
-                curr = lines[i].rstrip()
-                nxt = lines[i+1].lstrip()
-                # If current line ends a block/value and next line starts a new key
-                if (curr.endswith('}') or curr.endswith('"') or (curr and curr[-1].isdigit())) and nxt.startswith('"') and not curr.endswith(','):
-                     new_lines.append(lines[i].rstrip() + ",")
-                else:
-                     new_lines.append(lines[i])
-            new_lines.append(lines[-1])
-            content = "\n".join(new_lines)
-            
-            try:
-                data = json.loads(content)
-                print("✅ Automated fix succeeded!")
-                found_path.write_text(content, encoding="utf-8")
-            except Exception as e2:
-                print(f"❌ Automated fix failed: {e2}")
-                print("Please fix the JSON manually using the context above.")
-                return
-
-        print(f"✅ JSON is valid. Found {len(data)} users.")
-        
-        # Reset admin password
-        admin_email = "admin@takorama.se"
-        admin_tag = None
-        for tag, u in data.items():
-            if u.get("email") == admin_email:
-                admin_tag = tag
-                break
-        
-        if not admin_tag:
-            print(f"⚠️ User {admin_email} not found. Creating it...")
-            admin_tag = "8Y2OJPDQIHH2"
-            data[admin_tag] = {
-                "first_name": "admin",
-                "last_name": "User",
-                "name": "admin User",
-                "email": admin_email,
-                "role": "portal_admin",
-                "org_id": "default"
-            }
-
-        salt, pwh = hash_password("password123")
-        data[admin_tag]["pwd_salt"] = salt
-        data[admin_tag]["pwd_hash"] = pwh
-        
-        found_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        print(f"🚀 SUCCESS: Password for {admin_email} reset to: password123")
-        print("Please restart your Docker containers now.")
-
-    except Exception as e:
-        print(f"❌ ERROR: {e}")
+            if data is not None:
+                print(f"  ✅ {filename} is now valid.")
+                p.write_text(final_content, encoding="utf-8")
+                
+                if filename == "users.json":
+                    admin_email = "admin@takorama.se"
+                    admin_tag = None
+                    for tag, u in data.items():
+                        if u.get("email") == admin_email:
+                            admin_tag = tag
+                            break
+                    if not admin_tag:
+                        admin_tag = "8Y2OJPDQIHH2"
+                        data[admin_tag] = {"email": admin_email, "role": "portal_admin", "org_id": "default"}
+                    
+                    salt, pwh = hash_password("password123")
+                    data[admin_tag]["pwd_salt"] = salt
+                    data[admin_tag]["pwd_hash"] = pwh
+                    p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+                    print(f"  🚀 SUCCESS: Reset admin@takorama.se password to: password123")
+            else:
+                print(f"  ❌ Failed to automatically fix {filename}. Please check it manually.")
+        except Exception as e:
+            print(f"  ❌ Error processing {filename}: {e}")
 
 if __name__ == "__main__":
     fix()
