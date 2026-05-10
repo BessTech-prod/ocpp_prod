@@ -251,7 +251,7 @@ UI.applyVisibilityByRole = function applyVisibilityByRole(me){
 UI.initPage = async function initPage(opts){
   try {
     UI.initTheme();
-    const me = await UI.requireRole(opts?.requiredRoles || ['user','org_admin','portal_admin','admin']);
+    const me = await UI.requireRole(opts?.requiredRoles || ['user','org_admin','portal_admin','admin','installer']);
     if (!me) return null;
     UI.initNavbar(me);
     UI.applyRoleAwareLinks(me);
