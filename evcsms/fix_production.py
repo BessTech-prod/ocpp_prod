@@ -43,11 +43,46 @@ def fix():
         if "<<<<<<" in content:
             print("⚠️ Conflict markers found! Attempting to clean them...")
             import re
+            # Keep "ours" (local production data)
             content = re.sub(r'<<<<<<<.*?[\n\r](.*?)=======.*?>>>>>>>.*?\n?', r'\1', content, flags=re.DOTALL)
             found_path.write_text(content, encoding="utf-8")
             print("✅ Conflict markers removed.")
 
-        data = json.loads(content)
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON Decode Error: {e}")
+            lines = content.splitlines()
+            start = max(0, e.lineno - 5)
+            end = min(len(lines), e.lineno + 5)
+            print("\nContext around error:")
+            for i in range(start, end):
+                prefix = ">>> " if i + 1 == e.lineno else "    "
+                print(f"{prefix}{i+1}: {lines[i]}")
+            
+            # Attempt a simple fix: add missing commas between lines that look like they need them
+            print("\nAttempting automated 'missing comma' fix...")
+            new_lines = []
+            for i in range(len(lines)-1):
+                curr = lines[i].rstrip()
+                nxt = lines[i+1].lstrip()
+                # If current line ends a block/value and next line starts a new key
+                if (curr.endswith('}') or curr.endswith('"') or (curr and curr[-1].isdigit())) and nxt.startswith('"') and not curr.endswith(','):
+                     new_lines.append(lines[i].rstrip() + ",")
+                else:
+                     new_lines.append(lines[i])
+            new_lines.append(lines[-1])
+            content = "\n".join(new_lines)
+            
+            try:
+                data = json.loads(content)
+                print("✅ Automated fix succeeded!")
+                found_path.write_text(content, encoding="utf-8")
+            except Exception as e2:
+                print(f"❌ Automated fix failed: {e2}")
+                print("Please fix the JSON manually using the context above.")
+                return
+
         print(f"✅ JSON is valid. Found {len(data)} users.")
         
         # Reset admin password
