@@ -28,6 +28,8 @@ try:
         Action as Action201,
         RegistrationStatusEnumType as RegistrationStatus201,
         AuthorizationStatusEnumType as AuthorizationStatus201,
+        MessagePriorityEnumType as MessagePriority201,
+        MessageFormatEnumType as MessageFormat201,
     )
 except ImportError:
     try:
@@ -35,12 +37,16 @@ except ImportError:
             Action as Action201,
             RegistrationStatusType as RegistrationStatus201,
             AuthorizationStatusType as AuthorizationStatus201,
+            MessagePriorityType as MessagePriority201,
+            MessageFormatType as MessageFormat201,
         )
     except ImportError:
         from ocpp.v201.enums import (
             Action as Action201,
             RegistrationStatus as RegistrationStatus201,
             AuthorizationStatus as AuthorizationStatus201,
+            MessagePriority as MessagePriority201,
+            MessageFormat as MessageFormat201,
         )
 
 # Helper to get enum members that might be lowercase or uppercase
@@ -122,6 +128,20 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
             return call201.Reset(type=reset_type)
         if command == "unlock_connector":
             return call201.UnlockConnector(evse_id=int(payload.get("connector_id", 1)), connector_id=1)
+        if command == "set_display_message":
+            url = payload.get("url")
+            priority = payload.get("priority", "Normal")
+            msg_id = int(payload.get("id", 1))
+            return call201.SetDisplayMessage(
+                message={
+                    "id": msg_id,
+                    "priority": get_enum_member(MessagePriority201, priority),
+                    "message": {
+                        "format": get_enum_member(MessageFormat201, "URI"),
+                        "content": url
+                    }
+                }
+            )
         raise ValueError(f"Command {command} not implemented for OCPP 2.0.1")
 
     if command == "reset":

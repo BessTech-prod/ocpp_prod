@@ -566,6 +566,16 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
             raise HTTPException(400, "key måste vara text eller lista")
         return {"key": keys}
 
+    if command == "set_display_message":
+        url = (payload.get("url") or "").strip()
+        if not url:
+            raise HTTPException(400, "url krävs för set_display_message")
+        return {
+            "url": url,
+            "priority": str(payload.get("priority", "Normal")).strip() or "Normal",
+            "id": _as_int(payload.get("id", 1), "id", minimum=1)
+        }
+
     raise HTTPException(400, f"Ogiltigt command: {command}")
 
 
@@ -1074,6 +1084,7 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
         "remote_start_transaction",
         "remote_stop_transaction",
         "get_configuration",
+        "set_display_message",
     }
     if command not in allowed_commands:
         raise HTTPException(400, f"Ogiltigt command. Tillåtna: {', '.join(sorted(allowed_commands))}")
