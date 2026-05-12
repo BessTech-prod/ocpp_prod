@@ -8,7 +8,7 @@
 
   async function initOrgFilter(role){
     const wrap=document.getElementById('orgFilterWrap'), sel=document.getElementById('orgFilter'), th=document.getElementById('thOrg');
-    if(role==='portal_admin'||role==='admin'){
+    if(role==='portal_admin'||role==='admin'||role==='installer'){
       if(wrap) wrap.style.display=''; if(th) th.style.display='';
       try{ const orgs=await UI.getJSON(API.orgs); sel.innerHTML=`<option value="">Alla organisationer</option>` + Object.entries(orgs).map(([id,o])=>`<option value="${esc(id)}">${esc(o?.name||id)} (${esc(id)})</option>`).join(''); sel.addEventListener('change', refresh); }
       catch(e){ console.warn('orgFilter kunde inte laddas', e.message); }
@@ -62,7 +62,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', async ()=>{
-    const me = await UI.initPage({ requiredRoles:['org_admin','portal_admin','admin'] }); if(!me) return;
+    const me = await UI.initPage({ requiredRoles:['org_admin','portal_admin','admin','installer'] }); if(!me) return;
     await initOrgFilter((me.role||'').toLowerCase());
     document.getElementById('btnRefresh')?.addEventListener('click', refresh);
     document.getElementById('filterInput')?.addEventListener('input', refresh);
