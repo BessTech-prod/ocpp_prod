@@ -23,11 +23,33 @@ from ocpp.v16 import call_result, call
 from ocpp.v201 import ChargePoint as CP201
 from ocpp.v201 import call_result as call_result201
 from ocpp.v201 import call as call201
-from ocpp.v201.enums import (
-    Action as Action201,
-    RegistrationStatusType as RegistrationStatus201,
-    AuthorizationStatusType as AuthorizationStatus201,
-)
+try:
+    from ocpp.v201.enums import (
+        Action as Action201,
+        RegistrationStatusEnumType as RegistrationStatus201,
+        AuthorizationStatusEnumType as AuthorizationStatus201,
+    )
+except ImportError:
+    try:
+        from ocpp.v201.enums import (
+            Action as Action201,
+            RegistrationStatusType as RegistrationStatus201,
+            AuthorizationStatusType as AuthorizationStatus201,
+        )
+    except ImportError:
+        from ocpp.v201.enums import (
+            Action as Action201,
+            RegistrationStatus as RegistrationStatus201,
+            AuthorizationStatus as AuthorizationStatus201,
+        )
+
+# Helper to get enum members that might be lowercase or uppercase
+def get_enum_member(cls, name):
+    for attr in [name.lower(), name.capitalize(), name.upper()]:
+        if hasattr(cls, attr):
+            return getattr(cls, attr)
+    # If no member found, return capitalized name as string (OCPP spec style)
+    return name.capitalize()
 
 from app.auth_store import AuthStore
 from app.history_export import enrich_transaction_snapshot
@@ -476,7 +498,7 @@ class CentralSystemCP201(CP201):
         return call_result201.BootNotification(
             current_time=iso_now(),
             interval=30,
-            status=RegistrationStatus201.accepted
+            status=get_enum_member(RegistrationStatus201, "accepted")
         )
 
     @on(Action201.heartbeat)
@@ -500,9 +522,9 @@ class CentralSystemCP201(CP201):
         auth_store = AuthStore(AUTH_FILE)
         allowed = auth_store.contains(id_tag)
         ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
-        status = AuthorizationStatus201.accepted if ok else AuthorizationStatus201.blocked
+        status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
         masked_tag = (normalize_tag(id_tag)[:4] + "***") if normalize_tag(id_tag) else "***"
-        logger.info("[%s] Authorize (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, status.value)
+        logger.info("[%s] Authorize (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
         return call_result201.Authorize(id_token_info={"status": status})
 
     @on(Action201.transaction_event)
