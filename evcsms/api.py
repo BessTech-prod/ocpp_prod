@@ -380,6 +380,28 @@ def require_installer_or_higher(s=Depends(get_session)):
         raise HTTPException(403, "Portal admin or installer required")
     return s
 
+async def require_installer_or_api_key(request: Request, api_key: Optional[str] = Query(None)):
+    # Try session first
+    token = request.cookies.get("session")
+    if token:
+        try:
+            session = verify_token(token)
+            if (session.get("role") or "").lower() in ("portal_admin", "admin", "installer"):
+                return session
+        except:
+            pass
+
+    # Try API key
+    if api_key:
+        ext_key = validate_external_api_key(request, api_key)
+        return {
+            "email": f"api_key:{ext_key['key_hash'][:8]}",
+            "role": "installer",
+            "org_id": ext_key["org_id"]
+        }
+
+    raise HTTPException(401, "Not authenticated (valid session or api_key required)")
+
 def require_org_admin_or_portal(s=Depends(get_session)):
     if (s.get("role") or "").lower() not in ("org_admin", "portal_admin", "admin", "installer"):
         raise HTTPException(403, "Admin/org_admin or installer required")
@@ -1075,7 +1097,7 @@ async def api_portal_live_chargers(org_id: Optional[str] = None, session=Depends
     }
 
 @app.post("/api/portal/ocpp/command")
-async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require_installer_or_higher)):
+async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require_installer_or_api_key)):
     cp_id = (body.cp_id or "").strip()
     command = (body.command or "").strip().lower()
 
@@ -1083,6 +1105,14 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
         raise HTTPException(400, "cp_id krävs")
     if not command:
         raise HTTPException(400, "command krävs")
+
+    # Org check
+    org_id = session.get("org_id")
+    if org_id:
+        cps_map = normalize_cps_map(load_cps_map())
+        cp_data = cps_map.get(cp_id)
+        if not cp_data or (cp_data.get("org_id") or "default") != org_id:
+            raise HTTPException(403, "Du har inte behörighet att styra denna laddare")
 
     allowed_commands = {
         "reset",
@@ -1134,7 +1164,7 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
     return {"ok": True, "command_id": command_id, "status": "queued"}
 
 @app.get("/api/portal/ocpp/command/{command_id}")
-async def api_portal_ocpp_command_status(command_id: str, session=Depends(require_installer_or_higher)):
+async def api_portal_ocpp_command_status(command_id: str, session=Depends(require_installer_or_api_key)):
     raw = redis_client.get(f"ocpp:command_result:{command_id}")
     if not raw:
         raise HTTPException(404, "Kommandoresultat saknas eller har löpt ut")
