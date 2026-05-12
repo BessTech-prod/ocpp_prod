@@ -529,7 +529,7 @@ class CentralSystemCP201(CP201):
     async def on_status_notification(self, timestamp, connector_status, evse_id, connector_id, **kwargs):
         status_key = f"connector_status:{self.id}:{evse_id}"
         status_data = {
-            "status": str(connector_status),
+            "status": make_json_safe(connector_status),
             "error": "NoError",
             "timestamp": timestamp,
         }
@@ -550,7 +550,33 @@ class CentralSystemCP201(CP201):
     @on(Action201.transaction_event)
     async def on_transaction_event(self, event_type, timestamp, trigger_reason, seq_no, transaction_info, **kwargs):
         tx_id = transaction_info.get("transactionId")
-        event_type = str(event_type).split(".")[-1]  # Get 'Started', 'Updated', 'Ended'
+        event_type = make_json_safe(event_type)  # Get 'Started', 'Updated', 'Ended'
+
+        # Update connector status if chargingState is present for UI compatibility
+        charging_state = make_json_safe(transaction_info.get("chargingState"))
+        evse_id = int(kwargs.get("evse", {}).get("id", 1))
+        if charging_state:
+            status_map = {
+                "Charging": "Charging",
+                "EVConnected": "Preparing",
+                "SuspendedEV": "SuspendedEV",
+                "SuspendedEVSE": "SuspendedEVSE",
+                "Idle": "Finishing",
+            }
+            mapped_status = status_map.get(charging_state, charging_state)
+            status_key = f"connector_status:{self.id}:{evse_id}"
+            self.redis.set(status_key, json.dumps({
+                "status": mapped_status,
+                "error": "NoError",
+                "timestamp": timestamp,
+            }))
+        elif event_type == "Ended":
+            status_key = f"connector_status:{self.id}:{evse_id}"
+            self.redis.set(status_key, json.dumps({
+                "status": "Available",
+                "error": "NoError",
+                "timestamp": timestamp,
+            }))
 
         if event_type == "Started":
             id_token = kwargs.get("id_token", {})

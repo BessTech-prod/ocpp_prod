@@ -82,7 +82,7 @@
   UI.normalizeChargerStatus = function normalizeChargerStatus(raw){
     const v = String(raw || '').trim().toLowerCase();
     if (!v) return 'no_data';
-    if (v === 'charging') return 'charging';
+    if (v === 'charging' || v === 'occupied') return 'charging';
     if (v === 'available') return 'available';
     if (v === 'preparing') return 'preparing';
     if (v === 'finishing') return 'finishing';
