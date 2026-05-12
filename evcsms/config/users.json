@@ -66,8 +66,6 @@
     "email": "peter.persson@takorama.se",
     "role": "user",
     "org_id": "Takorama_Storås",
-    "pwd_salt": "hVytPWJIhCK241njI6sqwQ",
-    "pwd_hash": "W23vBzHNVNkf8whycnzQOHQ8XypgllFMExWUvND5d7c"
     "pwd_salt": "r99_9YVWps76ObwtMJySrQ",
     "pwd_hash": "uOUq530JV6DWmHnAqcpWbtsPQImTl8DUyG3LBFimZUQ"
   },
