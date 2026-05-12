@@ -426,11 +426,12 @@ class CentralSystemCP(CP):
 
     @on(Action.authorize)
     async def on_authorize(self, id_tag, **kwargs):
+        id_tag = normalize_tag(id_tag)
         auth_store = AuthStore(AUTH_FILE)
         allowed = auth_store.contains(id_tag)
         ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
-        masked_tag = (normalize_tag(id_tag)[:4] + "***") if normalize_tag(id_tag) else "***"
+        masked_tag = (id_tag[:4] + "***") if id_tag else "***"
         logger.info("[%s] Authorize id_tag=%s -> %s", self.id, masked_tag, status.value)
         return call_result.Authorize(id_tag_info={"status": status})
 
@@ -439,6 +440,7 @@ class CentralSystemCP(CP):
         # Get next transaction ID from Redis
         tx_id = self.redis.incr("next_tx_id")
 
+        id_tag = normalize_tag(id_tag)
         auth_store = AuthStore(AUTH_FILE)
         allowed = auth_store.contains(id_tag)
         ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
