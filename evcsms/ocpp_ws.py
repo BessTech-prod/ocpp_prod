@@ -25,8 +25,8 @@ from ocpp.v201 import call_result as call_result201
 from ocpp.v201 import call as call201
 from ocpp.v201.enums import (
     Action as Action201,
-    RegistrationStatus as RegistrationStatus201,
-    AuthorizationStatus as AuthorizationStatus201,
+    RegistrationStatusType as RegistrationStatus201,
+    AuthorizationStatusType as AuthorizationStatus201,
 )
 
 from app.auth_store import AuthStore
