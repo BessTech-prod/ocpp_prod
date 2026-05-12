@@ -461,7 +461,7 @@
   }
 
   async function bootstrap(){
-    state.me = await UI.initPage({ requiredRoles: ['org_admin', 'portal_admin', 'admin'] });
+    state.me = await UI.initPage({ requiredRoles: ['org_admin', 'portal_admin', 'admin', 'installer'] });
     if (!state.me) return;
 
     state.orgs = await UI.getJSON(API.orgs);

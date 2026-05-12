@@ -381,8 +381,8 @@ def require_installer_or_higher(s=Depends(get_session)):
     return s
 
 def require_org_admin_or_portal(s=Depends(get_session)):
-    if (s.get("role") or "").lower() not in ("org_admin", "portal_admin", "admin"):
-        raise HTTPException(403, "Admin/org_admin required")
+    if (s.get("role") or "").lower() not in ("org_admin", "portal_admin", "admin", "installer"):
+        raise HTTPException(403, "Admin/org_admin or installer required")
     return s
 
 # =====================================================================

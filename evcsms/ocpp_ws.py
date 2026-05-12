@@ -20,6 +20,15 @@ from ocpp.v16 import ChargePoint as CP
 from ocpp.v16.enums import Action, AuthorizationStatus, RegistrationStatus
 from ocpp.v16 import call_result, call
 
+from ocpp.v201 import ChargePoint as CP201
+from ocpp.v201 import call_result as call_result201
+from ocpp.v201 import call as call201
+from ocpp.v201.enums import (
+    Action as Action201,
+    RegistrationStatus as RegistrationStatus201,
+    AuthorizationStatus as AuthorizationStatus201,
+)
+
 from app.auth_store import AuthStore
 from app.history_export import enrich_transaction_snapshot
 from app.redis_config import build_redis_client
@@ -80,9 +89,18 @@ def make_json_safe(value):
     return str(value)
 
 
-def build_ocpp_call(command: str, payload: dict):
+def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
     command = (command or "").strip().lower()
     payload = payload or {}
+
+    if version == "2.0.1":
+        if command == "reset":
+            # Map 1.6 reset types to 2.0.1 if possible
+            reset_type = "Immediate" if str(payload.get("type")).lower() == "hard" else "OnIdle"
+            return call201.Reset(type=reset_type)
+        if command == "unlock_connector":
+            return call201.UnlockConnector(evse_id=int(payload.get("connector_id", 1)), connector_id=1)
+        raise ValueError(f"Command {command} not implemented for OCPP 2.0.1")
 
     if command == "reset":
         reset_type = str(payload.get("type", "Hard"))
@@ -163,7 +181,7 @@ async def command_worker():
                 continue
 
             try:
-                request = build_ocpp_call(command, payload)
+                request = build_ocpp_call(command, payload, getattr(cp, "ocpp_version", "1.6"))
                 response = await cp.call(request)
                 set_command_result(
                     command_id,
@@ -326,6 +344,7 @@ class CentralSystemCP(CP):
     def __init__(self, cp_id, websocket):
         super().__init__(cp_id, websocket)
         self.redis = redis_client
+        self.ocpp_version = "1.6"
 
     @on(Action.boot_notification)
     async def on_boot_notification(self, charge_point_vendor, charge_point_model, **kwargs):
@@ -445,6 +464,128 @@ class CentralSystemCP(CP):
         return call_result.StopTransaction()
 
 
+class CentralSystemCP201(CP201):
+    def __init__(self, cp_id, websocket):
+        super().__init__(cp_id, websocket)
+        self.redis = redis_client
+        self.ocpp_version = "2.0.1"
+
+    @on(Action201.boot_notification)
+    async def on_boot_notification(self, charging_station, reason, **kwargs):
+        logger.info("[%s] BootNotification (v2.0.1) from %s", self.id, charging_station.get("vendorName"))
+        return call_result201.BootNotification(
+            current_time=iso_now(),
+            interval=30,
+            status=RegistrationStatus201.accepted
+        )
+
+    @on(Action201.heartbeat)
+    async def on_heartbeat(self):
+        return call_result201.Heartbeat(current_time=iso_now())
+
+    @on(Action201.status_notification)
+    async def on_status_notification(self, timestamp, connector_status, evse_id, connector_id, **kwargs):
+        status_key = f"connector_status:{self.id}:{evse_id}"
+        status_data = {
+            "status": str(connector_status),
+            "error": "NoError",
+            "timestamp": timestamp,
+        }
+        self.redis.set(status_key, json.dumps(status_data))
+        return call_result201.StatusNotification()
+
+    @on(Action201.authorize)
+    async def on_authorize(self, id_token, **kwargs):
+        id_tag = id_token.get("idToken")
+        auth_store = AuthStore(AUTH_FILE)
+        allowed = auth_store.contains(id_tag)
+        ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
+        status = AuthorizationStatus201.accepted if ok else AuthorizationStatus201.blocked
+        masked_tag = (normalize_tag(id_tag)[:4] + "***") if normalize_tag(id_tag) else "***"
+        logger.info("[%s] Authorize (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, status.value)
+        return call_result201.Authorize(id_token_info={"status": status})
+
+    @on(Action201.transaction_event)
+    async def on_transaction_event(self, event_type, timestamp, trigger_reason, seq_no, transaction_info, **kwargs):
+        tx_id = transaction_info.get("transactionId")
+        event_type = str(event_type).split(".")[-1]  # Get 'Started', 'Updated', 'Ended'
+
+        if event_type == "Started":
+            id_token = kwargs.get("id_token", {})
+            id_tag = id_token.get("idToken", "unknown")
+            meter_start = 0
+            meter_value = kwargs.get("meter_value", [])
+            if meter_value:
+                # Try to find energy imported
+                for mv in meter_value:
+                    for sampled in mv.get("sampledValue", []):
+                        if sampled.get("measurand") == "Energy.Active.Import.Register":
+                            meter_start = float(sampled.get("value", 0))
+
+            rfids = load_rfids_map()
+            rfid = rfids.get(normalize_tag(id_tag), {})
+
+            entry = {
+                "transaction_id": tx_id,
+                "charge_point": self.id,
+                "connectorId": int(kwargs.get("evse", {}).get("id", 1)),
+                "id_tag": id_tag,
+                "tag_alias": rfid.get("alias") or normalize_tag(id_tag),
+                "user_email": rfid.get("user_email"),
+                "start_time": timestamp,
+                "meter_start": meter_start,
+                "stop_time": None,
+                "meter_stop": None
+            }
+
+            entry = enrich_transaction_snapshot(
+                entry,
+                rfids_map=rfids,
+                cps_map=load_json(CPS_FILE, {}),
+                users_map=load_json(USERS_FILE, {}),
+                orgs_map=load_json(ORGS_FILE, {}),
+            )
+
+            self.redis.set(f"open_tx:{tx_id}", json.dumps(entry))
+            try:
+                txs = load_json(TRANSACTIONS_FILE, [])
+                txs.append(entry)
+                TRANSACTIONS_FILE.write_text(json.dumps(txs, indent=2, ensure_ascii=False), encoding="utf-8")
+            except Exception as e:
+                logger.error("Failed to save 2.0.1 transaction: %s", e)
+
+        elif event_type == "Ended":
+            tx_key = f"open_tx:{tx_id}"
+            tx_data = self.redis.get(tx_key)
+            if tx_data:
+                entry = json.loads(tx_data)
+                entry["stop_time"] = timestamp
+                
+                meter_stop = entry.get("meter_start", 0)
+                meter_value = kwargs.get("meter_value", [])
+                if meter_value:
+                    for mv in meter_value:
+                        for sampled in mv.get("sampledValue", []):
+                            if sampled.get("measurand") == "Energy.Active.Import.Register":
+                                meter_stop = float(sampled.get("value", 0))
+                
+                entry["meter_stop"] = meter_stop
+                self.redis.delete(tx_key)
+                try:
+                    txs = load_json(TRANSACTIONS_FILE, [])
+                    for tx in txs:
+                        if str(tx.get("transaction_id")) == str(tx_id):
+                            tx.update(entry)
+                            break
+                    else:
+                        txs.append(entry)
+                    TRANSACTIONS_FILE.write_text(json.dumps(txs, indent=2, ensure_ascii=False), encoding="utf-8")
+                except Exception as e:
+                    logger.error("Failed to update 2.0.1 transaction: %s", e)
+
+        return call_result201.TransactionEvent()
+
+
 async def on_connect(websocket, path):
     parsed = urlsplit(path)
     cp_id = parsed.path.strip("/")
@@ -483,7 +624,11 @@ async def on_connect(websocket, path):
     # Track connected CP in Redis
     redis_client.sadd("connected_cps", cp_id)
 
-    cp = CentralSystemCP(cp_id, websocket)
+    if websocket.subprotocol == "ocpp2.0.1":
+        cp = CentralSystemCP201(cp_id, websocket)
+    else:
+        cp = CentralSystemCP(cp_id, websocket)
+
     connected_clients[cp_id] = cp
     try:
         await cp.start()
@@ -504,7 +649,7 @@ async def main():
         on_connect,
         host="0.0.0.0",
         port=OCPP_PORT,
-        subprotocols=["ocpp1.6"],
+        subprotocols=["ocpp1.6", "ocpp2.0.1"],
         ping_interval=20,
         ping_timeout=20,
     )

@@ -135,8 +135,28 @@
         <td>${statusBadge(c1)}</td>
         <td>${statusBadge(c2)}</td>
         <td>${esc(ts)}</td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary" data-manage="${esc(it.cp_id)}"><i class="bi bi-gear"></i> Hantera</button></td>
       </tr>`;
     }).join('');
+
+    $$('#liveTable button[data-manage]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cpId = btn.getAttribute('data-manage');
+        const sel = $('#cpPick');
+        if (sel) {
+          sel.value = cpId;
+          // Trigger change event to update command options if needed
+          sel.dispatchEvent(new Event('change'));
+          $('#cpPick').scrollIntoView({ behavior: 'smooth' });
+          // Highlight the card
+          const card = $('#cpPick').closest('.card');
+          if (card) {
+            card.classList.add('border-primary');
+            setTimeout(() => card.classList.remove('border-primary'), 2000);
+          }
+        }
+      });
+    });
   }
 
   function renderCpPick(){

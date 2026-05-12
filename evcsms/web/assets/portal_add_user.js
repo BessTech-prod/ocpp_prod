@@ -364,7 +364,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', async ()=>{
-    const me = await UI.initPage({ requiredRoles:['portal_admin','admin'] }); if(!me) return;
+    const me = await UI.initPage({ requiredRoles:['portal_admin','admin','installer'] }); if(!me) return;
     await initOrgs();
     document.getElementById('btnRefreshList')?.addEventListener('click', refresh);
     document.getElementById('filterInput')?.addEventListener('input', refresh);

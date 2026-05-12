@@ -130,7 +130,7 @@
   }
 
   async function refresh(){
-    const [cpsResp, stResp, mapRaw] = await Promise.all([
+    const [cpsResp, stResp, orgs, mapRaw] = await Promise.all([
       getJSON(API.cps), getJSON(API.status), getJSON(API.orgs), getJSON(API.map).catch(() => ({}))
     ]);
     const allCps = unionCpList(cpsResp, stResp);
