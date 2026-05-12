@@ -142,6 +142,16 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
                     }
                 }
             )
+        if command == "set_variables":
+            variables = payload.get("variables", [])
+            set_var_data = []
+            for v in variables:
+                set_var_data.append({
+                    "attributeValue": str(v.get("value")),
+                    "component": {"name": v.get("component")},
+                    "variable": {"name": v.get("variable")}
+                })
+            return call201.SetVariables(set_variable_data=set_var_data)
         raise ValueError(f"Command {command} not implemented for OCPP 2.0.1")
 
     if command == "reset":
@@ -538,12 +548,12 @@ class CentralSystemCP201(CP201):
 
     @on(Action201.authorize)
     async def on_authorize(self, id_token, **kwargs):
-        id_tag = id_token.get("idToken")
+        id_tag = normalize_tag(id_token.get("idToken"))
         auth_store = AuthStore(AUTH_FILE)
         allowed = auth_store.contains(id_tag)
         ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
         status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
-        masked_tag = (normalize_tag(id_tag)[:4] + "***") if normalize_tag(id_tag) else "***"
+        masked_tag = (id_tag[:4] + "***") if id_tag else "***"
         logger.info("[%s] Authorize (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
         return call_result201.Authorize(id_token_info={"status": status})
 
@@ -578,9 +588,21 @@ class CentralSystemCP201(CP201):
                 "timestamp": timestamp,
             }))
 
+        id_token_info = None
         if event_type == "Started":
             id_token = kwargs.get("id_token", {})
-            id_tag = id_token.get("idToken", "unknown")
+            id_tag = normalize_tag(id_token.get("idToken", "unknown"))
+            
+            # Perform authorization check
+            auth_store = AuthStore(AUTH_FILE)
+            allowed = auth_store.contains(id_tag)
+            ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
+            status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
+            id_token_info = {"status": status}
+            
+            masked_tag = (id_tag[:4] + "***") if id_tag != "UNKNOWN" else "UNKNOWN"
+            logger.info("[%s] Transaction Started (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
+
             meter_start = 0
             meter_value = kwargs.get("meter_value", [])
             if meter_value:
@@ -651,7 +673,7 @@ class CentralSystemCP201(CP201):
                 except Exception as e:
                     logger.error("Failed to update 2.0.1 transaction: %s", e)
 
-        return call_result201.TransactionEvent()
+        return call_result201.TransactionEvent(id_token_info=id_token_info)
 
 
 async def on_connect(websocket, path):

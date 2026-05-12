@@ -576,6 +576,15 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
             "id": _as_int(payload.get("id", 1), "id", minimum=1)
         }
 
+    if command == "set_variables":
+        vars_list = payload.get("variables")
+        if not isinstance(vars_list, list):
+            raise HTTPException(400, "variables måste vara en lista")
+        for v in vars_list:
+            if not isinstance(v, dict) or "component" not in v or "variable" not in v or "value" not in v:
+                raise HTTPException(400, "Varje variabel måste ha component, variable och value")
+        return {"variables": vars_list}
+
     raise HTTPException(400, f"Ogiltigt command: {command}")
 
 
@@ -1085,6 +1094,7 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
         "remote_stop_transaction",
         "get_configuration",
         "set_display_message",
+        "set_variables",
     }
     if command not in allowed_commands:
         raise HTTPException(400, f"Ogiltigt command. Tillåtna: {', '.join(sorted(allowed_commands))}")
