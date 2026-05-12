@@ -28,6 +28,8 @@ try:
         Action as Action201,
         RegistrationStatusEnumType as RegistrationStatus201,
         AuthorizationStatusEnumType as AuthorizationStatus201,
+        MessagePriorityEnumType as MessagePriority201,
+        MessageFormatEnumType as MessageFormat201,
     )
 except ImportError:
     try:
@@ -35,12 +37,16 @@ except ImportError:
             Action as Action201,
             RegistrationStatusType as RegistrationStatus201,
             AuthorizationStatusType as AuthorizationStatus201,
+            MessagePriorityType as MessagePriority201,
+            MessageFormatType as MessageFormat201,
         )
     except ImportError:
         from ocpp.v201.enums import (
             Action as Action201,
             RegistrationStatus as RegistrationStatus201,
             AuthorizationStatus as AuthorizationStatus201,
+            MessagePriority as MessagePriority201,
+            MessageFormat as MessageFormat201,
         )
 
 # Helper to get enum members that might be lowercase or uppercase
@@ -122,6 +128,20 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
             return call201.Reset(type=reset_type)
         if command == "unlock_connector":
             return call201.UnlockConnector(evse_id=int(payload.get("connector_id", 1)), connector_id=1)
+        if command == "set_display_message":
+            url = payload.get("url")
+            priority = payload.get("priority", "Normal")
+            msg_id = int(payload.get("id", 1))
+            return call201.SetDisplayMessage(
+                message={
+                    "id": msg_id,
+                    "priority": get_enum_member(MessagePriority201, priority),
+                    "message": {
+                        "format": get_enum_member(MessageFormat201, "URI"),
+                        "content": url
+                    }
+                }
+            )
         raise ValueError(f"Command {command} not implemented for OCPP 2.0.1")
 
     if command == "reset":
@@ -509,7 +529,7 @@ class CentralSystemCP201(CP201):
     async def on_status_notification(self, timestamp, connector_status, evse_id, connector_id, **kwargs):
         status_key = f"connector_status:{self.id}:{evse_id}"
         status_data = {
-            "status": str(connector_status),
+            "status": make_json_safe(connector_status),
             "error": "NoError",
             "timestamp": timestamp,
         }
@@ -530,7 +550,33 @@ class CentralSystemCP201(CP201):
     @on(Action201.transaction_event)
     async def on_transaction_event(self, event_type, timestamp, trigger_reason, seq_no, transaction_info, **kwargs):
         tx_id = transaction_info.get("transactionId")
-        event_type = str(event_type).split(".")[-1]  # Get 'Started', 'Updated', 'Ended'
+        event_type = make_json_safe(event_type)  # Get 'Started', 'Updated', 'Ended'
+
+        # Update connector status if chargingState is present for UI compatibility
+        charging_state = make_json_safe(transaction_info.get("chargingState"))
+        evse_id = int(kwargs.get("evse", {}).get("id", 1))
+        if charging_state:
+            status_map = {
+                "Charging": "Charging",
+                "EVConnected": "Preparing",
+                "SuspendedEV": "SuspendedEV",
+                "SuspendedEVSE": "SuspendedEVSE",
+                "Idle": "Finishing",
+            }
+            mapped_status = status_map.get(charging_state, charging_state)
+            status_key = f"connector_status:{self.id}:{evse_id}"
+            self.redis.set(status_key, json.dumps({
+                "status": mapped_status,
+                "error": "NoError",
+                "timestamp": timestamp,
+            }))
+        elif event_type == "Ended":
+            status_key = f"connector_status:{self.id}:{evse_id}"
+            self.redis.set(status_key, json.dumps({
+                "status": "Available",
+                "error": "NoError",
+                "timestamp": timestamp,
+            }))
 
         if event_type == "Started":
             id_token = kwargs.get("id_token", {})
