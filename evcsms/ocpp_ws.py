@@ -235,6 +235,7 @@ async def command_worker():
             try:
                 request = build_ocpp_call(command, payload, getattr(cp, "ocpp_version", "1.6"))
                 response = await cp.call(request)
+                logger.info("[%s] Command %s response: %s", cp_id, command, make_json_safe(response))
                 set_command_result(
                     command_id,
                     {
@@ -414,6 +415,7 @@ class CentralSystemCP(CP):
 
     @on(Action.status_notification)
     async def on_status_notification(self, connector_id, status, error_code, **kwargs):
+        logger.info("[%s] StatusNotification connector=%s status=%s", self.id, connector_id, status)
         connector_id = int(connector_id)
         status_key = f"connector_status:{self.id}:{connector_id}"
         status_data = {
@@ -445,6 +447,9 @@ class CentralSystemCP(CP):
         allowed = auth_store.contains(id_tag)
         ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
+
+        masked_tag = (id_tag[:4] + "***") if id_tag else "***"
+        logger.info("[%s] StartTransaction id_tag=%s -> %s", self.id, masked_tag, status.value)
 
         rfids = load_rfids_map()
         rfid = rfids.get(normalize_tag(id_tag), {})
@@ -489,6 +494,7 @@ class CentralSystemCP(CP):
 
     @on(Action.stop_transaction)
     async def on_stop_transaction(self, transaction_id, meter_stop, timestamp, **kwargs):
+        logger.info("[%s] StopTransaction tx_id=%s", self.id, transaction_id)
         tx_id = int(transaction_id)
         tx_key = f"open_tx:{tx_id}"
 
@@ -535,10 +541,12 @@ class CentralSystemCP201(CP201):
 
     @on(Action201.heartbeat)
     async def on_heartbeat(self):
+        logger.info("[%s] Heartbeat (v2.0.1)", self.id)
         return call_result201.Heartbeat(current_time=iso_now())
 
     @on(Action201.status_notification)
     async def on_status_notification(self, timestamp, connector_status, evse_id, connector_id, **kwargs):
+        logger.info("[%s] StatusNotification (v2.0.1) evse=%s status=%s", self.id, evse_id, make_json_safe(connector_status))
         status_key = f"connector_status:{self.id}:{evse_id}"
         status_data = {
             "status": make_json_safe(connector_status),
@@ -550,7 +558,8 @@ class CentralSystemCP201(CP201):
 
     @on(Action201.authorize)
     async def on_authorize(self, id_token, **kwargs):
-        id_tag = normalize_tag(id_token.get("idToken"))
+        token_dict = make_json_safe(id_token)
+        id_tag = normalize_tag(token_dict.get("idToken"))
         auth_store = AuthStore(AUTH_FILE)
         allowed = auth_store.contains(id_tag)
         ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
@@ -563,6 +572,7 @@ class CentralSystemCP201(CP201):
     async def on_transaction_event(self, event_type, timestamp, trigger_reason, seq_no, transaction_info, **kwargs):
         tx_id = transaction_info.get("transactionId")
         event_type = make_json_safe(event_type)  # Get 'Started', 'Updated', 'Ended'
+        logger.info("[%s] TransactionEvent type=%s tx_id=%s", self.id, event_type, tx_id)
 
         # Update connector status if chargingState is present for UI compatibility
         charging_state = make_json_safe(transaction_info.get("chargingState"))
@@ -592,8 +602,9 @@ class CentralSystemCP201(CP201):
 
         id_token_info = None
         if event_type == "Started":
-            id_token = kwargs.get("id_token", {})
-            id_tag = normalize_tag(id_token.get("idToken", "unknown"))
+            id_token = kwargs.get("id_token")
+            token_dict = make_json_safe(id_token) if id_token else {}
+            id_tag = normalize_tag(token_dict.get("idToken", "unknown"))
             
             # Perform authorization check
             auth_store = AuthStore(AUTH_FILE)
