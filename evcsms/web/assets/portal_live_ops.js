@@ -10,6 +10,7 @@
   };
 
   const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
 
   const state = {
     orgs: {},
@@ -50,6 +51,12 @@
     },
     get_configuration: {
       showConfigKeys: true,
+    },
+    set_variables: {
+      showSetVariables: true,
+    },
+    set_display_message: {
+      showDisplayMessage: true,
     },
   };
 
@@ -220,6 +227,8 @@
     toggleField('#connectorWrap', !!cfg.showConnector);
     toggleField('#idTagWrap', !!cfg.showIdTag);
     toggleField('#configKeyWrap', !!cfg.showConfigKeys);
+    toggleField('#displayMessageWrap', !!cfg.showDisplayMessage);
+    toggleField('#setVariablesWrap', !!cfg.showSetVariables);
 
     const cfgSelect = $('#configKeySelect');
     if (cfgSelect && cfg.showConfigKeys) {
@@ -306,6 +315,22 @@
       payload.connector_id = connectorId;
     } else if (command === 'get_configuration') {
       if (configKeyValue && configKeyValue !== '__all__') payload.key = configKeyValue;
+    } else if (command === 'set_variables') {
+      const comp = ($('#setVarComponent')?.value || '').trim();
+      const variable = ($('#setVarVariable')?.value || '').trim();
+      const val = ($('#setVarValue')?.value || '').trim();
+      if (!comp || !variable || !val) {
+        UI.alert('Fyll i komponent, variabel och värde.');
+        return;
+      }
+      payload.variables = [{ component: comp, variable: variable, value: val }];
+    } else if (command === 'set_display_message') {
+      const url = ($('#displayMessageUrl')?.value || '').trim();
+      if (!url) {
+        UI.alert('Ange en bild-URL.');
+        return;
+      }
+      payload.url = url;
     }
 
     if (!confirmDangerousCommand(command, cpId, payload)){

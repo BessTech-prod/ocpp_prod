@@ -119,6 +119,8 @@
                       <option value="remote_start_transaction">Fjärrstart</option>
                       <option value="remote_stop_transaction">Fjärrstop</option>
                       <option value="get_configuration">Hämta konfiguration</option>
+                      <option value="set_variables">Konfigurera (OCPP 2.0.1)</option>
+                      <option value="set_display_message">Visa logotyp (OCPP 2.0.1)</option>
                     </select>
                   </div>
                   <div class="col-12 col-md-6" id="commandArgWrap">
@@ -145,6 +147,26 @@
                       <option value="AuthorizeRemoteTxRequests">AuthorizeRemoteTxRequests</option>
                       <option value="ConnectionTimeOut">ConnectionTimeOut</option>
                     </select>
+                  </div>
+                  <div class="col-12 col-md-6 d-none" id="displayMessageWrap">
+                    <label for="displayMessageUrl" class="form-label">Bild-URL (PNG/JPG)</label>
+                    <input id="displayMessageUrl" type="text" class="form-control" placeholder="https://...">
+                  </div>
+                  <div class="col-12 d-none" id="setVariablesWrap">
+                    <div class="row g-2">
+                      <div class="col-12 col-md-4">
+                        <label for="setVarComponent" class="form-label">Komponent</label>
+                        <input id="setVarComponent" type="text" class="form-control" placeholder="Ex: TxCtrlr">
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label for="setVarVariable" class="form-label">Variabel</label>
+                        <input id="setVarVariable" type="text" class="form-control" placeholder="Ex: TxStartPoint">
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label for="setVarValue" class="form-label">Värde</label>
+                        <input id="setVarValue" type="text" class="form-control" placeholder="Ex: Authorized">
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -180,7 +202,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/assets/ui-common.js"></script>
-  <script src="/assets/portal_live_ops.js?v=6"></script>
+  <script src="/assets/portal_live_ops.js?v=7"></script>
 </body>
 </html>
 

@@ -353,9 +353,10 @@ def org_for_cp(cp_id: str) -> str:
 def is_tag_allowed_on_cp(tag: str, cp_id: str) -> bool:
     """
     Policy:
-    - Taggen måste vara whitelistaD
-    - CP måste tillhöra samma org som användarens org
-    - Om PORTAL_TAGS_GLOBAL=true → portal_admin alltid accepterad
+    - Taggen måste finnas i rfids.json eller users.json
+    - Taggen måste vara aktiv
+    - CP måste tillhöra samma org som användarens org (eller vara default)
+    - Om PORTAL_TAGS_GLOBAL=true → portal_admin alltid accepterad på alla CP
     """
     tag = normalize_tag(tag)
     users = load_json(USERS_FILE, {})
@@ -366,25 +367,23 @@ def is_tag_allowed_on_cp(tag: str, cp_id: str) -> bool:
         if not bool(rfid.get("active", True)):
             return False
         user_email = (rfid.get("user_email") or "").strip().lower()
-        if not user_email:
-            return False
-        u = find_user_by_email(users, user_email)
-        if not u:
-            return False
-        tag_role = (u.get("role") or "user").lower()
-        tag_org = rfid.get("org_id") or u.get("org_id")
+        u = find_user_by_email(users, user_email) if user_email else None
+        
+        tag_role = (u.get("role") if u else "user").lower()
+        tag_org = (rfid.get("org_id") or (u.get("org_id") if u else "default") or "default").strip()
     else:
         # Legacy fallback: users keyed by RFID tag
         u = users.get(tag)
         if not u:
+            # Okänd tagg
             return False
         tag_role = (u.get("role") or "user").lower()
-        tag_org = u.get("org_id")
+        tag_org = (u.get("org_id") or "default").strip()
 
     cp_org = org_for_cp(cp_id)
 
     # Portal-admin override
-    portal_global = os.getenv("PORTAL_TAGS_GLOBAL", "false").lower() in ("1", "true", "yes")
+    portal_global = os.getenv("PORTAL_TAGS_GLOBAL", "true").lower() in ("1", "true", "yes")
     if portal_global and tag_role in ("portal_admin", "admin"):
         return True
 
@@ -429,9 +428,7 @@ class CentralSystemCP(CP):
     @on(Action.authorize)
     async def on_authorize(self, id_tag, **kwargs):
         id_tag = normalize_tag(id_tag)
-        auth_store = AuthStore(AUTH_FILE)
-        allowed = auth_store.contains(id_tag)
-        ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
+        ok = is_tag_allowed_on_cp(id_tag, self.id)
         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
         masked_tag = (id_tag[:4] + "***") if id_tag else "***"
         logger.info("[%s] Authorize id_tag=%s -> %s", self.id, masked_tag, status.value)
@@ -443,9 +440,7 @@ class CentralSystemCP(CP):
         tx_id = self.redis.incr("next_tx_id")
 
         id_tag = normalize_tag(id_tag)
-        auth_store = AuthStore(AUTH_FILE)
-        allowed = auth_store.contains(id_tag)
-        ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
+        ok = is_tag_allowed_on_cp(id_tag, self.id)
         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
 
         masked_tag = (id_tag[:4] + "***") if id_tag else "***"
@@ -560,9 +555,7 @@ class CentralSystemCP201(CP201):
     async def on_authorize(self, id_token, **kwargs):
         token_dict = make_json_safe(id_token)
         id_tag = normalize_tag(token_dict.get("idToken"))
-        auth_store = AuthStore(AUTH_FILE)
-        allowed = auth_store.contains(id_tag)
-        ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
+        ok = is_tag_allowed_on_cp(id_tag, self.id)
         status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
         masked_tag = (id_tag[:4] + "***") if id_tag else "***"
         logger.info("[%s] Authorize (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
@@ -607,9 +600,7 @@ class CentralSystemCP201(CP201):
             id_tag = normalize_tag(token_dict.get("idToken", "unknown"))
             
             # Perform authorization check
-            auth_store = AuthStore(AUTH_FILE)
-            allowed = auth_store.contains(id_tag)
-            ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
+            ok = is_tag_allowed_on_cp(id_tag, self.id)
             status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
             id_token_info = {"status": status}
             

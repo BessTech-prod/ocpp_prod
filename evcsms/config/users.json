@@ -69,7 +69,7 @@
     "first_name": "Sofia",
     "last_name": "Danielsson Mereus",
     "name": "Sofia Danielsson Mereus",
-    "email": "sodia.mereus@gmail.com",
+    "email": "sofia.mereus@gmail.com",
     "role": "user",
     "org_id": "Takorama_Storås",
     "pwd_salt": "F3WIeBq9n9Jxqe7oS7VKjg",
@@ -106,9 +106,9 @@
     "pwd_hash": "LzaUI43RzsxK6qFwODKqSGNl9FJ0_gYFfhYG4aZrZT8"
   },
   "5BB6EA8A": {
-    "first_name": "magnud",
+    "first_name": "magnus",
     "last_name": "mustachAB",
-    "name": "magnud mustachAB",
+    "name": "magnus mustachAB",
     "email": "mustach@mycket.se",
     "role": "user",
     "org_id": "Takorama_Storås",
