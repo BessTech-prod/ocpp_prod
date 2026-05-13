@@ -1,6 +1,8 @@
 # app/auth_store.py
 from __future__ import annotations
 import json
+import os
+import uuid
 from pathlib import Path
 from threading import RLock
 from typing import Set, List
@@ -18,18 +20,31 @@ class AuthStore:
 
     def load(self) -> None:
         with self._lock:
-            if self._path.exists():
-                try:
-                    data = json.loads(self._path.read_text(encoding="utf-8"))
-                    self._tags = {str(t).strip() for t in data}
-                except Exception:
-                    self._tags = set()
-            else:
+            if not self._path.exists():
                 self._tags = set()
+                return
+            try:
+                content = self._path.read_text(encoding="utf-8").strip()
+                if not content:
+                    self._tags = set()
+                    return
+                data = json.loads(content)
+                self._tags = {str(t).strip() for t in data}
+            except Exception as e:
+                # If file exists but is corrupted, we don't want to continue and risk wiping it
+                raise RuntimeError(f"Auth file {self._path} exists but is corrupted: {e}")
 
     def _save_unlocked(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(sorted(self._tags), indent=2), encoding="utf-8")
+        tmp_path = self._path.with_suffix(f".tmp.{uuid.uuid4().hex}")
+        try:
+            tmp_path.write_text(json.dumps(sorted(self._tags), indent=2), encoding="utf-8")
+            os.replace(tmp_path, self._path)
+        except Exception:
+            if tmp_path.exists():
+                try: tmp_path.unlink()
+                except: pass
+            raise
 
     def save(self) -> None:
         with self._lock:

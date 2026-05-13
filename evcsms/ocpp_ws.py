@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -291,13 +292,30 @@ async def wait_for_redis(retries: int = 15, delay_seconds: float = 2.0):
 # =====================================================================
 def load_json(path: Path, default):
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+        if not path.exists():
+            return default
+        content = path.read_text(encoding="utf-8").strip()
+        if not content:
+            return default
+        return json.loads(content)
+    except Exception as e:
+        logger.error(f"Failed to load JSON from {path}: {e}")
+        if path.exists():
+            raise RuntimeError(f"JSON file {path} exists but is corrupted or unreadable") from e
         return default
 
 def save_json(path: Path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp_path = path.with_suffix(f".tmp.{uuid.uuid4().hex}")
+    try:
+        tmp_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp_path, path)
+    except Exception as e:
+        logger.error(f"Failed to save JSON to {path}: {e}")
+        if tmp_path.exists():
+            try: tmp_path.unlink()
+            except: pass
+        raise
 
 def normalize_tag(tag: str) -> str:
     return (tag or "").strip().upper()
@@ -343,7 +361,7 @@ def ensure_default_org():
     orgs = load_json(ORGS_FILE, {})
     if "default" not in orgs:
         orgs["default"] = {"name": "Default"}
-        ORGS_FILE.write_text(json.dumps(orgs, indent=2, ensure_ascii=False), encoding="utf-8")
+        save_json(ORGS_FILE, orgs)
 
 def org_for_cp(cp_id: str) -> str:
     """Returnera CP-org (om saknas → 'default')."""
@@ -481,7 +499,7 @@ class CentralSystemCP(CP):
         try:
             txs = load_json(TRANSACTIONS_FILE, [])
             txs.append(entry)
-            TRANSACTIONS_FILE.write_text(json.dumps(txs, indent=2, ensure_ascii=False), encoding="utf-8")
+            save_json(TRANSACTIONS_FILE, txs)
         except Exception as e:
             logger.error("Failed to save transaction: %s", e)
 
@@ -515,7 +533,7 @@ class CentralSystemCP(CP):
                         break
                 else:
                     txs.append(entry)
-                TRANSACTIONS_FILE.write_text(json.dumps(txs, indent=2, ensure_ascii=False), encoding="utf-8")
+                save_json(TRANSACTIONS_FILE, txs)
             except Exception as e:
                 logger.error("Failed to update transaction: %s", e)
 
@@ -651,7 +669,7 @@ class CentralSystemCP201(CP201):
             try:
                 txs = load_json(TRANSACTIONS_FILE, [])
                 txs.append(entry)
-                TRANSACTIONS_FILE.write_text(json.dumps(txs, indent=2, ensure_ascii=False), encoding="utf-8")
+                save_json(TRANSACTIONS_FILE, txs)
             except Exception as e:
                 logger.error("Failed to save 2.0.1 transaction: %s", e)
 
@@ -680,7 +698,7 @@ class CentralSystemCP201(CP201):
                             break
                     else:
                         txs.append(entry)
-                    TRANSACTIONS_FILE.write_text(json.dumps(txs, indent=2, ensure_ascii=False), encoding="utf-8")
+                    save_json(TRANSACTIONS_FILE, txs)
                 except Exception as e:
                     logger.error("Failed to update 2.0.1 transaction: %s", e)
 
@@ -717,7 +735,7 @@ async def on_connect(websocket, path):
         cps = load_json(CPS_FILE, {})
         if cp_id not in cps:
             cps[cp_id] = {"org_id": "default", "alias": cp_id}
-            CPS_FILE.write_text(json.dumps(cps, indent=2, ensure_ascii=False), encoding="utf-8")
+            save_json(CPS_FILE, cps)
             logger.info("CP '%s' automapped to org 'default'", cp_id)
     else:
         logger.info("CP '%s' connected without automap (CP_AUTOMAP_ON_CONNECT=false)", cp_id)

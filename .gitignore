@@ -48,6 +48,7 @@ venv.bak/
 *.bak
 *.swp
 *~
+*.tmp.*
 api.py.backup
 api.py.bak
 app/main.py.bak.*

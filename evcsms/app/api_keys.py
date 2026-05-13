@@ -37,19 +37,31 @@ class ApiKeyManager:
     
     def load(self) -> None:
         """Load API keys from disk."""
-        if self._path.exists():
-            try:
-                data = json.loads(self._path.read_text(encoding="utf-8"))
-                self._keys = data
-            except Exception:
-                self._keys = {}
-        else:
+        if not self._path.exists():
             self._keys = {}
+            return
+        try:
+            content = self._path.read_text(encoding="utf-8").strip()
+            if not content:
+                self._keys = {}
+                return
+            self._keys = json.loads(content)
+        except Exception as e:
+            # Prevent wiping the file if it exists but can't be loaded
+            raise RuntimeError(f"API keys file {self._path} exists but is corrupted: {e}")
     
     def _save(self) -> None:
-        """Save API keys to disk."""
+        """Save API keys to disk atomically."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(self._keys, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp_path = self._path.with_suffix(f".tmp.{uuid.uuid4().hex}")
+        try:
+            tmp_path.write_text(json.dumps(self._keys, indent=2, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp_path, self._path)
+        except Exception:
+            if tmp_path.exists():
+                try: tmp_path.unlink()
+                except: pass
+            raise
     
     def _hash_key(self, raw_key: str) -> str:
         """Hash API key using SHA256."""

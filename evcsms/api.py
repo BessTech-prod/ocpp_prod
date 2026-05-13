@@ -108,13 +108,28 @@ def load_json(path: Path, default):
     try:
         if not path.exists():
             return default
-        return json.loads(path.read_text(encoding="utf-8"))
+        content = path.read_text(encoding="utf-8").strip()
+        if not content:
+            return default
+        return json.loads(content)
     except Exception as e:
         logger.error(f"Failed to load JSON from {path}: {e}")
+        if path.exists():
+            # If file exists but is corrupted, raise error to prevent wiping it with empty data
+            raise RuntimeError(f"JSON file {path} exists but is corrupted or unreadable") from e
         return default
 
 def save_json(path: Path, data):
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp_path = path.with_suffix(f".tmp.{uuid.uuid4().hex}")
+    try:
+        tmp_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp_path, path)
+    except Exception as e:
+        logger.error(f"Failed to save JSON to {path}: {e}")
+        if tmp_path.exists():
+            try: tmp_path.unlink()
+            except: pass
+        raise
 
 def load_transactions() -> List[dict]:
     return load_json(TRANSACTIONS_FILE, [])
