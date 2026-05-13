@@ -1,7 +1,6 @@
 services:
   redis-service:
     image: redis:7-alpine
-    container_name: redis-service
     restart: unless-stopped
     expose:
       - "6379"
@@ -20,7 +19,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.ocpp_ws
-    container_name: ocpp-ws-service
     restart: unless-stopped
     ports:
       - "127.0.0.1:9000:9000"
@@ -49,7 +47,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.api
-    container_name: api-service
     restart: unless-stopped
     ports:
       - "127.0.0.1:8000:8000"
@@ -77,7 +74,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.ui
-    container_name: ui-service
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:80"
@@ -94,7 +90,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.backup
-    container_name: backup-service
     restart: unless-stopped
     environment:
       - PYTHONPATH=/app

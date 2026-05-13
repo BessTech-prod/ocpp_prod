@@ -143,7 +143,7 @@ You're reading this because...
 
 ### **How to Access**
 ✅ `./run.sh logs` (easiest)  
-✅ `docker logs <service>` (direct)  
+✅ `docker compose logs <service>` (direct)  
 ✅ `/data/logs/*.log` (if persistent logging enabled)
 
 ### **How to Identify Fault**
@@ -300,15 +300,15 @@ A: Not built-in. Use command line or set up Grafana Loki (advanced)
 ### **Before Contacting Support, Gather:**
 ```bash
 # 1. Save logs
-docker logs api-service > support_logs_api.txt 2>&1
-docker logs ocpp-ws-service > support_logs_ocpp.txt 2>&1
-docker logs redis-service > support_logs_redis.txt 2>&1
+docker compose logs api-service > support_logs_api.txt 2>&1
+docker compose logs ocpp-ws-service > support_logs_ocpp.txt 2>&1
+docker compose logs redis-service > support_logs_redis.txt 2>&1
 
 # 2. Run diagnostics
 bash diagnose_outage.sh > support_diagnosis.txt 2>&1
 
 # 3. Check status
-docker compose -f docker-compose.yml ps > support_status.txt
+docker compose ps > support_status.txt
 
 # Send these files to support with timestamp of outage
 ```

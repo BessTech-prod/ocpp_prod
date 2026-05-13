@@ -56,18 +56,18 @@ echo ""
 # ============================================
 echo -e "${YELLOW}[2/6] Testing Redis Connectivity...${NC}"
 
-if docker exec redis-service redis-cli ping > /dev/null 2>&1; then
+if docker compose exec redis-service redis-cli ping > /dev/null 2>&1; then
     echo -e "${GREEN}✓ Redis is responding${NC}"
-    REDIS_INFO=$(docker exec redis-service redis-cli INFO server | grep redis_version | cut -d: -f2 | tr -d '\r')
+    REDIS_INFO=$(docker compose exec redis-service redis-cli INFO server | grep redis_version | cut -d: -f2 | tr -d '\r')
     echo "  Version: $REDIS_INFO"
 else
     echo -e "${RED}✗ Redis is NOT responding${NC}"
     echo -e "  ${YELLOW}This causes complete system failure.${NC}"
     echo ""
     echo "  Trying to restart Redis..."
-    docker restart redis-service 2>/dev/null || echo "  Failed to restart"
+    docker compose restart redis-service 2>/dev/null || echo "  Failed to restart"
     sleep 2
-    if docker exec redis-service redis-cli ping > /dev/null 2>&1; then
+    if docker compose exec redis-service redis-cli ping > /dev/null 2>&1; then
         echo -e "  ${GREEN}✓ Redis restarted successfully${NC}"
     else
         echo -e "  ${RED}✗ Redis still not responding - CHECK PROVIDER${NC}"
@@ -89,7 +89,7 @@ else
     echo -e "${RED}✗ API not responding (HTTP $API_RESPONSE)${NC}"
     echo -e "  ${YELLOW}Checking API service logs...${NC}"
     echo ""
-    docker logs --tail=20 api-service 2>&1 | tail -10
+    docker compose logs --tail=20 api-service 2>&1 | tail -10
 fi
 echo ""
 
@@ -103,12 +103,12 @@ SERVICES=("api-service" "ocpp-ws-service" "redis-service" "backup-service")
 ERROR_FOUND=0
 
 for SERVICE in "${SERVICES[@]}"; do
-    ERROR_COUNT=$(docker logs --tail=200 $SERVICE 2>&1 | grep -i "error\|exception\|failed\|crashed" | wc -l)
+    ERROR_COUNT=$(docker compose logs --tail=200 $SERVICE 2>&1 | grep -i "error\|exception\|failed\|crashed" | wc -l)
     if [ $ERROR_COUNT -gt 0 ]; then
         ERROR_FOUND=1
         echo -e "${RED}$SERVICE: Found $ERROR_COUNT error(s)${NC}"
         echo "  Recent errors:"
-        docker logs --tail=50 $SERVICE 2>&1 | grep -i "error\|exception\|failed\|crashed" | head -3 | sed 's/^/  /'
+        docker compose logs --tail=50 $SERVICE 2>&1 | grep -i "error\|exception\|failed\|crashed" | head -3 | sed 's/^/  /'
     fi
 done
 
@@ -213,10 +213,10 @@ if [ "$CHARGER_COUNT" = "0" ]; then
 fi
 
 echo "4. If issues persist, collect debug info:"
-echo "   docker compose -f docker-compose.yml ps > debug_status.txt"
-echo "   docker logs api-service >> debug_logs.txt 2>&1"
-echo "   docker logs ocpp-ws-service >> debug_logs.txt 2>&1"
-echo "   docker logs redis-service >> debug_logs.txt 2>&1"
+echo "   docker compose ps > debug_status.txt"
+echo "   docker compose logs api-service >> debug_logs.txt 2>&1"
+echo "   docker compose logs ocpp-ws-service >> debug_logs.txt 2>&1"
+echo "   docker compose logs redis-service >> debug_logs.txt 2>&1"
 echo ""
 echo "5. Then contact support with debug files."
 echo ""
