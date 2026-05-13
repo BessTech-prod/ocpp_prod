@@ -281,18 +281,28 @@ def normalize_cps_map(raw: dict) -> dict:
     return out
 
 def display_name_for_tag(tag: str, users_map: dict) -> str:
+    tag = normalize_tag(tag)
+    rfids_map = load_rfids_map()
+    rfid = rfids_map.get(tag, {})
+    alias = (rfid.get("alias") or "").strip()
+    
     u = users_map.get(tag, {})
     if not u:
-        rfid = load_rfids_map().get(normalize_tag(tag), {})
         email = (rfid.get("user_email") or "").strip().lower()
         _, u = find_user_by_email(users_map, email)
-        if not u:
-            return rfid.get("alias") or tag
-    if u.get("name"):
-        return u["name"]
-    fn = (u.get("first_name") or "").strip()
-    ln = (u.get("last_name") or "").strip()
-    return (fn + " " + ln).strip() or tag
+    
+    name = ""
+    if u:
+        if u.get("name"):
+            name = str(u["name"]).strip()
+        else:
+            fn = (u.get("first_name") or "").strip()
+            ln = (u.get("last_name") or "").strip()
+            name = (fn + " " + ln).strip()
+    
+    if name and alias and alias != tag:
+        return f"{name} ({alias})"
+    return name or alias or tag
 
 def iso_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")

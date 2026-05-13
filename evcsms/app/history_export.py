@@ -91,18 +91,25 @@ def find_user_by_email(users_map: Dict[str, dict], email: str | None) -> Tuple[s
 
 def display_name_for_tag(tag: str, users_map: Dict[str, dict], rfids_map: Dict[str, dict]) -> str:
     tag = normalize_tag(tag)
+    rfid = rfids_map.get(tag) or {}
+    alias = (rfid.get("alias") or "").strip()
+
     user = users_map.get(tag) or {}
     if not user:
-        rfid = rfids_map.get(tag) or {}
         _, user = find_user_by_email(users_map, rfid.get("user_email"))
-        if not user:
-            return (rfid.get("alias") or tag or "Unknown").strip() or "Unknown"
-    if user.get("name"):
-        return str(user["name"]).strip()
-    first_name = str(user.get("first_name") or "").strip()
-    last_name = str(user.get("last_name") or "").strip()
-    full_name = f"{first_name} {last_name}".strip()
-    return full_name or tag or "Unknown"
+
+    name = ""
+    if user:
+        if user.get("name"):
+            name = str(user["name"]).strip()
+        else:
+            fn = str(user.get("first_name") or "").strip()
+            ln = str(user.get("last_name") or "").strip()
+            name = f"{fn} {ln}".strip()
+
+    if name and alias and alias != tag:
+        return f"{name} ({alias})"
+    return name or alias or tag or "Unknown"
 
 
 def resolve_transaction_snapshot(

@@ -156,6 +156,21 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
                     "variable": {"name": v.get("variable")}
                 })
             return call201.SetVariables(set_variable_data=set_var_data)
+
+        if command == "remote_start_transaction":
+            id_tag = str(payload.get("id_tag", ""))
+            evse_id = int(payload.get("connector_id", 1))
+            return call201.RequestStartTransaction(
+                id_token={"id_token": id_tag, "type": "ISO14443"},
+                remote_start_id=int(uuid.uuid4().int % 2147483647),
+                evse_id=evse_id
+            )
+
+        if command == "remote_stop_transaction":
+            return call201.RequestStopTransaction(
+                transaction_id=str(payload.get("transaction_id", ""))
+            )
+
         raise ValueError(f"Command {command} not implemented for OCPP 2.0.1")
 
     if command == "reset":
@@ -237,9 +252,25 @@ async def command_worker():
                 continue
 
             try:
-                request = build_ocpp_call(command, payload, getattr(cp, "ocpp_version", "1.6"))
+                version = getattr(cp, "ocpp_version", "1.6")
+                request = build_ocpp_call(command, payload, version)
                 response = await cp.call(request)
                 logger.info("[%s] Command %s response: %s", cp_id, command, make_json_safe(response))
+
+                # Track tags for remote starts if successful
+                status = getattr(response, "status", "")
+                if hasattr(status, "value"): status = status.value
+                if str(status).lower() == "accepted":
+                    if command == "remote_start_transaction":
+                        id_tag = payload.get("id_tag")
+                        connector_id = payload.get("connector_id")
+                        if version == "2.0.1":
+                            remote_start_id = getattr(request, "remote_start_id", None)
+                            if hasattr(cp, "track_remote_start") and remote_start_id is not None:
+                                cp.track_remote_start(remote_start_id, id_tag)
+                        if hasattr(cp, "track_tag"):
+                            cp.track_tag(id_tag, connector_id)
+
                 set_command_result(
                     command_id,
                     {
@@ -418,6 +449,12 @@ class CentralSystemCP(CP):
         super().__init__(cp_id, websocket)
         self.redis = redis_client
         self.ocpp_version = "1.6"
+        self._last_id_tag = None
+
+    def track_tag(self, id_tag, connector_id=None):
+        id_tag = normalize_tag(id_tag)
+        if id_tag:
+            self._last_id_tag = id_tag
 
     @on(Action.boot_notification)
     async def on_boot_notification(self, charge_point_vendor, charge_point_model, **kwargs):
@@ -449,6 +486,7 @@ class CentralSystemCP(CP):
     @on(Action.authorize)
     async def on_authorize(self, id_tag, **kwargs):
         id_tag = normalize_tag(id_tag)
+        self.track_tag(id_tag)
         ok = is_tag_allowed_on_cp(id_tag, self.id)
         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
         masked_tag = (id_tag[:4] + "***") if id_tag else "***"
@@ -545,6 +583,19 @@ class CentralSystemCP201(CP201):
         super().__init__(cp_id, websocket)
         self.redis = redis_client
         self.ocpp_version = "2.0.1"
+        self._last_id_tag = None
+        self._evse_tags = {}
+        self._remote_start_tags = {}
+
+    def track_tag(self, id_tag, evse_id=None):
+        id_tag = normalize_tag(id_tag)
+        if id_tag:
+            self._last_id_tag = id_tag
+            if evse_id is not None:
+                self._evse_tags[int(evse_id)] = id_tag
+
+    def track_remote_start(self, remote_start_id, id_tag):
+        self._remote_start_tags[int(remote_start_id)] = normalize_tag(id_tag)
 
     @on(Action201.boot_notification)
     async def on_boot_notification(self, charging_station, reason, **kwargs):
@@ -580,6 +631,9 @@ class CentralSystemCP201(CP201):
     async def on_authorize(self, id_token, **kwargs):
         token_dict = make_json_safe(id_token) if id_token else {}
         id_tag = normalize_tag(token_dict.get("id_token") or token_dict.get("idToken"))
+        # evse_id is optional in Authorize
+        evse_id = kwargs.get("evse_id")
+        self.track_tag(id_tag, evse_id)
         ok = is_tag_allowed_on_cp(id_tag, self.id)
         status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
         masked_tag = (id_tag[:4] + "***") if id_tag else "***"
@@ -628,8 +682,23 @@ class CentralSystemCP201(CP201):
         if event_type == "Started":
             id_token = kwargs.get("id_token")
             token_dict = make_json_safe(id_token) if id_token else {}
-            id_tag = normalize_tag(token_dict.get("id_token") or token_dict.get("idToken") or "unknown")
+
+            remote_start_id = kwargs.get("remote_start_id")
+            remote_tag = self._remote_start_tags.get(int(remote_start_id)) if remote_start_id is not None else None
+
+            # Priority: 1. idToken in message, 2. remoteStartId association, 3. EVSE-specific tag, 4. last global tag
+            id_tag = normalize_tag(
+                token_dict.get("id_token") or 
+                token_dict.get("idToken") or 
+                remote_tag or
+                self._evse_tags.get(evse_id) or 
+                self._last_id_tag or 
+                "unknown"
+            )
             
+            # Track it for future events in this transaction if needed
+            self.track_tag(id_tag, evse_id)
+
             # Perform authorization check
             ok = is_tag_allowed_on_cp(id_tag, self.id)
             status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
