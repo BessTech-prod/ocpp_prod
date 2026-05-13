@@ -2542,11 +2542,21 @@ def _allowed_tags_for_session(session: dict, users_map: dict) -> Optional[Set[st
     role = session.get("role")
     if role in ("portal_admin", "admin", "installer"):
         return None
+    
+    oid = session.get("org_id")
     if role == "org_admin":
-        oid = session.get("org_id")
-        return {normalize_tag(t) for t, r in rfids.items() if (r.get("org_id") or "default") == oid}
-    email = (session.get("email") or "")
-    return {normalize_tag(t) for t, r in rfids.items() if (r.get("user_email") or "").strip().lower() == email.strip().lower()}
+        # Allow tags from rfids.json belonging to this org
+        tags = {normalize_tag(t) for t, r in rfids.items() if (r.get("org_id") or "default") == oid}
+        # Also allow tags from users.json belonging to this org (legacy fallback)
+        tags.update({normalize_tag(t) for t, u in users_map.items() if (u.get("org_id") or "default") == oid})
+        return tags
+    
+    email = (session.get("email") or "").strip().lower()
+    # User's own tags from rfids.json
+    tags = {normalize_tag(t) for t, r in rfids.items() if (r.get("user_email") or "").strip().lower() == email}
+    # User's own tags from users.json (legacy fallback)
+    tags.update({normalize_tag(t) for t, u in users_map.items() if (u.get("email") or "").strip().lower() == email})
+    return tags
 
 
 def _history_rows_for_session(days: int, tag: Optional[str], session: dict) -> List[dict]:
@@ -2555,34 +2565,53 @@ def _history_rows_for_session(days: int, tag: Optional[str], session: dict) -> L
     txs = load_transactions()
     users_map = load_users_map()
     allowed = _allowed_tags_for_session(session, users_map)
+    session_org_id = session.get("org_id")
 
     rows = []
     for tx in txs:
         stop = tx.get("stop_time")
         if not stop or tx.get("meter_stop") is None:
             continue
-        stop_dt = datetime.fromisoformat(stop.replace("Z", "+00:00"))
-        if stop_dt < cutoff:
+        
+        try:
+            stop_dt = datetime.fromisoformat(str(stop).replace("Z", "+00:00"))
+            if stop_dt < cutoff:
+                continue
+        except Exception:
             continue
 
-        tg = normalize_tag(tx.get("id_tag") or "")
+        tg = normalize_tag(tx.get("id_tag") or tx.get("tag") or "")
         if tag and tg != normalize_tag(tag):
             continue
-        if allowed is not None and tg not in allowed:
-            continue
+        
+        # Filtering for org_admin/user
+        if allowed is not None:
+            tx_org = tx.get("org_id")
+            # If the transaction itself is marked with the user's org, show it
+            if tx_org and tx_org == session_org_id:
+                pass 
+            # Otherwise, check if the tag belongs to the user's allowed set
+            elif tg not in allowed:
+                continue
 
-        e = (tx["meter_stop"] - tx["meter_start"]) / 1000.0
+        try:
+            m_stop = float(tx.get("meter_stop", 0))
+            m_start = float(tx.get("meter_start", 0))
+            e = (m_stop - m_start) / 1000.0
+        except (TypeError, ValueError):
+            e = 0.0
+
         rows.append({
             "tag": tg,
             "name": display_name_for_tag(tg, users_map),
-            "charge_point": tx.get("charge_point"),
-            "connectorId": tx.get("connectorId"),
+            "charge_point": tx.get("charge_point") or "Unknown",
+            "connectorId": tx.get("connectorId") or 1,
             "start_time": tx.get("start_time"),
             "stop_time": tx.get("stop_time"),
             "energy_kwh": round(max(0.0, e), 3),
         })
 
-    rows.sort(key=lambda r: r["stop_time"] or "", reverse=True)
+    rows.sort(key=lambda r: str(r.get("stop_time") or ""), reverse=True)
     return rows
 
 @app.get("/api/users/summary")
@@ -2598,15 +2627,29 @@ async def api_users_summary(days: int = 30, session=Depends(require_auth)):
         stop = tx.get("stop_time")
         if not stop or tx.get("meter_stop") is None:
             continue
-        stop_dt = datetime.fromisoformat(stop.replace("Z", "+00:00"))
-        if stop_dt < cutoff:
+        try:
+            stop_dt = datetime.fromisoformat(str(stop).replace("Z", "+00:00"))
+            if stop_dt < cutoff:
+                continue
+        except Exception:
             continue
 
-        tag = normalize_tag(tx.get("id_tag") or "")
-        if allowed is not None and tag not in allowed:
-            continue
+        tag = normalize_tag(tx.get("id_tag") or tx.get("tag") or "")
+        tx_org = tx.get("org_id")
+        
+        if allowed is not None:
+            if tx_org and tx_org == session.get("org_id"):
+                pass
+            elif tag not in allowed:
+                continue
 
-        e = (tx["meter_stop"] - tx["meter_start"]) / 1000.0
+        try:
+            m_stop = float(tx.get("meter_stop", 0))
+            m_start = float(tx.get("meter_start", 0))
+            e = (m_stop - m_start) / 1000.0
+        except (TypeError, ValueError):
+            e = 0.0
+            
         nm = display_name_for_tag(tag, users_map)
         row = summary.setdefault(tag, {"kwh": 0.0, "sessions": 0, "name": nm})
         row["kwh"] += max(0.0, e)
@@ -2695,15 +2738,23 @@ async def api_my_summary(days: int = 30, session=Depends(require_auth)):
         stop = tx.get("stop_time")
         if not stop or tx.get("meter_stop") is None:
             continue
-        stop_dt = datetime.fromisoformat(stop.replace("Z", "+00:00"))
-        if stop_dt < cutoff:
+        try:
+            stop_dt = datetime.fromisoformat(str(stop).replace("Z", "+00:00"))
+            if stop_dt < cutoff:
+                continue
+        except Exception:
             continue
 
-        if normalize_tag(tx.get("id_tag") or "") not in my_tags:
+        if normalize_tag(tx.get("id_tag") or tx.get("tag") or "") not in my_tags:
             continue
 
-        total += max(0.0, (tx["meter_stop"] - tx["meter_start"]) / 1000.0)
-        count += 1
+        try:
+            m_stop = float(tx.get("meter_stop", 0))
+            m_start = float(tx.get("meter_start", 0))
+            total += max(0.0, (m_stop - m_start) / 1000.0)
+            count += 1
+        except (TypeError, ValueError):
+            continue
 
     return {
         "period_days": days,

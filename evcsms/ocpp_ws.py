@@ -563,11 +563,13 @@ class CentralSystemCP201(CP201):
         return call_result201.Heartbeat(current_time=iso_now())
 
     @on(Action201.status_notification)
-    async def on_status_notification(self, timestamp, connector_status, evse_id, connector_id, **kwargs):
-        logger.info("[%s] StatusNotification (v2.0.1) evse=%s status=%s", self.id, evse_id, make_json_safe(connector_status))
+    async def on_status_notification(self, timestamp, connector_status, evse_id, connector_id=None, **kwargs):
+        evse_id = int(evse_id)
+        status_val = make_json_safe(connector_status)
+        logger.info("[%s] StatusNotification (v2.0.1) evse=%s status=%s", self.id, evse_id, status_val)
         status_key = f"connector_status:{self.id}:{evse_id}"
         status_data = {
-            "status": make_json_safe(connector_status),
+            "status": status_val,
             "error": "NoError",
             "timestamp": timestamp,
         }
@@ -594,7 +596,11 @@ class CentralSystemCP201(CP201):
 
         # Update connector status if chargingState is present for UI compatibility
         charging_state = tx_dict.get("charging_state") or tx_dict.get("chargingState")
-        evse_id = int(kwargs.get("evse", {}).get("id", 1))
+        
+        # Safely extract evse_id
+        evse_data = kwargs.get("evse") or {}
+        evse_id = int(evse_data.get("id", 1))
+
         if charging_state:
             status_map = {
                 "Charging": "Charging",
@@ -632,14 +638,15 @@ class CentralSystemCP201(CP201):
             masked_tag = (id_tag[:4] + "***") if id_tag != "UNKNOWN" else "UNKNOWN"
             logger.info("[%s] Transaction Started (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
 
-            meter_start = 0
-            meter_value = kwargs.get("meter_value", [])
-            if meter_value:
-                # Try to find energy imported
-                for mv in meter_value:
-                    for sampled in mv.get("sampled_value", mv.get("sampledValue", [])):
-                        if sampled.get("measurand") == "Energy.Active.Import.Register":
+            meter_start = 0.0
+            meter_values = kwargs.get("meter_value") or []
+            for mv in meter_values:
+                for sampled in (mv.get("sampled_value") or mv.get("sampledValue") or []):
+                    measurand = sampled.get("measurand", "Energy.Active.Import.Register")
+                    if measurand == "Energy.Active.Import.Register":
+                        try:
                             meter_start = float(sampled.get("value", 0))
+                        except (ValueError, TypeError): pass
 
             rfids = load_rfids_map()
             rfid = rfids.get(normalize_tag(id_tag), {})
@@ -647,7 +654,7 @@ class CentralSystemCP201(CP201):
             entry = {
                 "transaction_id": tx_id,
                 "charge_point": self.id,
-                "connectorId": int(kwargs.get("evse", {}).get("id", 1)),
+                "connectorId": evse_id,
                 "id_tag": id_tag,
                 "tag_alias": rfid.get("alias") or normalize_tag(id_tag),
                 "user_email": rfid.get("user_email"),
@@ -657,13 +664,16 @@ class CentralSystemCP201(CP201):
                 "meter_stop": None
             }
 
-            entry = enrich_transaction_snapshot(
-                entry,
-                rfids_map=rfids,
-                cps_map=load_json(CPS_FILE, {}),
-                users_map=load_json(USERS_FILE, {}),
-                orgs_map=load_json(ORGS_FILE, {}),
-            )
+            try:
+                entry = enrich_transaction_snapshot(
+                    entry,
+                    rfids_map=rfids,
+                    cps_map=load_json(CPS_FILE, {}),
+                    users_map=load_json(USERS_FILE, {}),
+                    orgs_map=load_json(ORGS_FILE, {}),
+                )
+            except Exception as e:
+                logger.error("Enrichment failed during 2.0.1 start: %s", e)
 
             self.redis.set(f"open_tx:{tx_id}", json.dumps(entry))
             try:
@@ -680,13 +690,15 @@ class CentralSystemCP201(CP201):
                 entry = json.loads(tx_data)
                 entry["stop_time"] = timestamp
                 
-                meter_stop = entry.get("meter_start", 0)
-                meter_value = kwargs.get("meter_value", [])
-                if meter_value:
-                    for mv in meter_value:
-                        for sampled in mv.get("sampled_value", mv.get("sampledValue", [])):
-                            if sampled.get("measurand") == "Energy.Active.Import.Register":
+                meter_stop = entry.get("meter_start", 0.0)
+                meter_values = kwargs.get("meter_value") or []
+                for mv in meter_values:
+                    for sampled in (mv.get("sampled_value") or mv.get("sampledValue") or []):
+                        measurand = sampled.get("measurand", "Energy.Active.Import.Register")
+                        if measurand == "Energy.Active.Import.Register":
+                            try:
                                 meter_stop = float(sampled.get("value", 0))
+                            except (ValueError, TypeError): pass
                 
                 entry["meter_stop"] = meter_stop
                 self.redis.delete(tx_key)
