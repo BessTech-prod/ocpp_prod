@@ -13,6 +13,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, Optional
 from urllib.parse import urlsplit, parse_qs
+from dataclasses import asdict, is_dataclass
 
 import websockets
 from ocpp.routing import on
@@ -104,6 +105,8 @@ def make_json_safe(value):
         return value
     if isinstance(value, Enum):
         return value.value
+    if is_dataclass(value):
+        return make_json_safe(asdict(value))
     if isinstance(value, dict):
         return {str(k): make_json_safe(v) for k, v in value.items()}
     if isinstance(value, (list, tuple, set)):
@@ -527,7 +530,9 @@ class CentralSystemCP201(CP201):
 
     @on(Action201.boot_notification)
     async def on_boot_notification(self, charging_station, reason, **kwargs):
-        logger.info("[%s] BootNotification (v2.0.1) from %s", self.id, charging_station.get("vendorName"))
+        cs_dict = make_json_safe(charging_station)
+        vendor = cs_dict.get("vendor_name") or cs_dict.get("vendorName") or "Unknown"
+        logger.info("[%s] BootNotification (v2.0.1) from %s", self.id, vendor)
         return call_result201.BootNotification(
             current_time=iso_now(),
             interval=30,
@@ -553,8 +558,8 @@ class CentralSystemCP201(CP201):
 
     @on(Action201.authorize)
     async def on_authorize(self, id_token, **kwargs):
-        token_dict = make_json_safe(id_token)
-        id_tag = normalize_tag(token_dict.get("idToken"))
+        token_dict = make_json_safe(id_token) if id_token else {}
+        id_tag = normalize_tag(token_dict.get("id_token") or token_dict.get("idToken"))
         ok = is_tag_allowed_on_cp(id_tag, self.id)
         status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
         masked_tag = (id_tag[:4] + "***") if id_tag else "***"
@@ -563,12 +568,14 @@ class CentralSystemCP201(CP201):
 
     @on(Action201.transaction_event)
     async def on_transaction_event(self, event_type, timestamp, trigger_reason, seq_no, transaction_info, **kwargs):
-        tx_id = transaction_info.get("transactionId")
+        kwargs = make_json_safe(kwargs)
+        tx_dict = make_json_safe(transaction_info)
+        tx_id = tx_dict.get("transaction_id") or tx_dict.get("transactionId")
         event_type = make_json_safe(event_type)  # Get 'Started', 'Updated', 'Ended'
         logger.info("[%s] TransactionEvent type=%s tx_id=%s", self.id, event_type, tx_id)
 
         # Update connector status if chargingState is present for UI compatibility
-        charging_state = make_json_safe(transaction_info.get("chargingState"))
+        charging_state = tx_dict.get("charging_state") or tx_dict.get("chargingState")
         evse_id = int(kwargs.get("evse", {}).get("id", 1))
         if charging_state:
             status_map = {
@@ -597,7 +604,7 @@ class CentralSystemCP201(CP201):
         if event_type == "Started":
             id_token = kwargs.get("id_token")
             token_dict = make_json_safe(id_token) if id_token else {}
-            id_tag = normalize_tag(token_dict.get("idToken", "unknown"))
+            id_tag = normalize_tag(token_dict.get("id_token") or token_dict.get("idToken") or "unknown")
             
             # Perform authorization check
             ok = is_tag_allowed_on_cp(id_tag, self.id)
@@ -612,7 +619,7 @@ class CentralSystemCP201(CP201):
             if meter_value:
                 # Try to find energy imported
                 for mv in meter_value:
-                    for sampled in mv.get("sampledValue", []):
+                    for sampled in mv.get("sampled_value", mv.get("sampledValue", [])):
                         if sampled.get("measurand") == "Energy.Active.Import.Register":
                             meter_start = float(sampled.get("value", 0))
 
@@ -659,7 +666,7 @@ class CentralSystemCP201(CP201):
                 meter_value = kwargs.get("meter_value", [])
                 if meter_value:
                     for mv in meter_value:
-                        for sampled in mv.get("sampledValue", []):
+                        for sampled in mv.get("sampled_value", mv.get("sampledValue", [])):
                             if sampled.get("measurand") == "Energy.Active.Import.Register":
                                 meter_stop = float(sampled.get("value", 0))
                 

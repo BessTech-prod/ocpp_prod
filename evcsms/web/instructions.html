@@ -100,6 +100,21 @@
           </div>
         </div>
         
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-shield-lock"></i> OCPP 2.0.1 Konfiguration (Autentisering)</h5>
+            <p>För OCPP 2.0.1-laddare används ett nytt system med <strong>Komponenter</strong> och <strong>Variabler</strong>. För att kräva RFID-autentisering:</p>
+            
+            <ol>
+              <li>Gå till <strong>Live driftpanel</strong>.</li>
+              <li>Välj laddaren och kommandot <strong>Konfigurera (OCPP 2.0.1)</strong>.</li>
+              <li>Sätt <strong>Komponent</strong> till <code>AuthCtrlr</code>, <strong>Variabel</strong> till <code>Enabled</code> och <strong>Värde</strong> till <code>true</code>.</li>
+              <li>Klicka på <strong>Skicka kommando</strong>.</li>
+            </ol>
+            <p class="small text-muted">Detta tvingar laddaren att fråga servern om lov innan laddning påbörjas.</p>
+          </div>
+        </div>
+
         <div class="card border-0 shadow-sm">
           <div class="card-body">
             <h5 class="card-title"><i class="bi bi-broadcast-pin"></i> Live-hantering</h5>
@@ -115,7 +130,7 @@
             <p class="mb-1"><strong>WS Endpoint:</strong></p>
             <p class="mb-3"><code>takoramcharge.se</code></p>
             <p class="mb-1"><strong>Protokoll:</strong></p>
-            <p class="mb-3">OCPP 1.6J</p>
+            <p class="mb-3">OCPP 1.6J & OCPP 2.0.1</p>
             <hr>
             <p class="small mb-0">Vid problem med anslutning, kontrollera att laddaren har internetåtkomst och att DNS kan slå upp takoramcharge.se.</p>
           </div>
