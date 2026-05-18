@@ -171,6 +171,23 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
                 transaction_id=str(payload.get("transaction_id", ""))
             )
 
+        if command == "get_base_report":
+            rb = payload.get("report_base", "FullInventory")
+            return call201.GetBaseReport(request_id=int(uuid.uuid4().int % 2147483647), report_base=rb)
+
+        if command == "get_variables":
+            vars_list = payload.get("variables", [])
+            gv_data = []
+            for v in vars_list:
+                gv_data.append({
+                    "component": {"name": v.get("component")},
+                    "variable": {"name": v.get("variable")}
+                })
+            return call201.GetVariables(get_variable_data=gv_data)
+
+        if command == "get_transaction_status":
+             return call201.GetTransactionStatus(transaction_id=str(payload.get("transaction_id", "")))
+
         raise ValueError(f"Command {command} not implemented for OCPP 2.0.1")
 
     if command == "reset":
@@ -642,6 +659,13 @@ class CentralSystemCP201(CP201):
                     evse_id = int(evse_id)
                     self._evse_tags[evse_id] = id_tag
                     self.redis.setex(f"last_tag:{self.id}:{evse_id}", 3600, id_tag)
+                
+                # Also store in a rolling buffer of recent tags (last 5) for the charger
+                # This helps if Authorize and TransactionEvent have slightly different contexts
+                key = f"recent_tags:{self.id}"
+                self.redis.lpush(key, id_tag)
+                self.redis.ltrim(key, 0, 4)
+                self.redis.expire(key, 600) # 10 minutes
             except Exception as e:
                 logger.warning("[%s] Failed to persist last_tag in Redis: %s", self.id, e)
 
@@ -733,6 +757,11 @@ class CentralSystemCP201(CP201):
         logger.info("[%s] Authorize (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
         return call_result201.Authorize(id_token_info={"status": status})
 
+    @on(Action201.data_transfer)
+    async def on_data_transfer(self, vendor_id, **kwargs):
+        logger.info("[%s] DataTransfer (v2.0.1) vendor=%s data=%s", self.id, vendor_id, kwargs)
+        return call_result201.DataTransfer(status="Accepted")
+
     @on(Action201.transaction_event)
     async def on_transaction_event(self, event_type, timestamp, trigger_reason, seq_no, transaction_info, **kwargs):
         kwargs = make_json_safe(kwargs)
@@ -802,17 +831,34 @@ class CentralSystemCP201(CP201):
                     if val: fallback_global = val.decode() if isinstance(val, bytes) else val
                 except: pass
 
-            token_tag = normalize_tag(token_dict.get("id_token") or token_dict.get("idToken"))
+            token_tag = normalize_tag(
+                token_dict.get("id_token") or 
+                token_dict.get("idToken") or 
+                token_dict.get("id_tag") or
+                (id_token.id_token if hasattr(id_token, "id_token") else None) or
+                (id_token.idToken if hasattr(id_token, "idToken") else None)
+            )
+
+            # Last Respite: Check recent tags buffer if still UNKNOWN
+            recent_tag = None
+            if not token_tag or token_tag == "UNKNOWN":
+                 try:
+                     # Get the most recent tag from the rolling buffer
+                     val = self.redis.lindex(f"recent_tags:{self.id}", 0)
+                     if val: recent_tag = val.decode() if isinstance(val, bytes) else val
+                 except: pass
+
             id_tag = (
                 token_tag if token_tag and token_tag != "UNKNOWN" else
                 remote_tag or
                 fallback_evse or 
                 fallback_global or 
+                recent_tag or
                 "UNKNOWN"
             )
             
-            logger.info("[%s] v2.0.1 tag resolution: idToken=%s remote=%s evse=%s global=%s -> final=%s", 
-                        self.id, token_dict.get("id_token") or token_dict.get("idToken"), remote_tag, fallback_evse, fallback_global, id_tag)
+            logger.info("[%s] v2.0.1 tag resolution: idToken=%s remote=%s evse=%s global=%s recent=%s -> final=%s", 
+                        self.id, token_tag, remote_tag, fallback_evse, fallback_global, recent_tag, id_tag)
 
             # Track it for future events in this transaction if needed
             self.track_tag(id_tag, evse_id)
@@ -925,8 +971,18 @@ async def on_connect(websocket, path):
         await websocket.close(code=1008, reason="Missing ChargeBoxId")
         return
 
+    # Normalize ID: some chargers might connect without 'ocpp/' prefix even if configured with it,
+    # or vice-versa. We check cps.json to find the best match.
+    cps = load_json(CPS_FILE, {})
+    if cp_id not in cps:
+        if f"ocpp/{cp_id}" in cps:
+            logger.info("Normalizing CP ID: '%s' -> 'ocpp/%s'", cp_id, cp_id)
+            cp_id = f"ocpp/{cp_id}"
+        elif cp_id.startswith("ocpp/") and cp_id[5:] in cps:
+             logger.info("Normalizing CP ID: '%s' -> '%s'", cp_id, cp_id[5:])
+             cp_id = cp_id[5:]
+
     if CP_AUTH_REQUIRED:
-        cps = load_json(CPS_FILE, {})
         known_cp = cp_id in cps
         if not known_cp:
             logger.warning("Rejected CP '%s' (unknown charge point id)", cp_id)
