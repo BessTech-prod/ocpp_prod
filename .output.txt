@@ -1,0 +1,1873 @@
+Command finished with exit code 0.
+Command output:
+diff --git a/.gitignore b/.gitignore
+index 833d597..c38698e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -48,7 +48,6 @@ venv.bak/
+ *.bak
+ *.swp
+ *~
+-*.tmp.*
+ api.py.backup
+ api.py.bak
+ app/main.py.bak.*
+diff --git a/OCPP_2.0.1_MANUAL.md b/OCPP_2.0.1_MANUAL.md
+deleted file mode 100644
+index a08569a..0000000
+--- a/OCPP_2.0.1_MANUAL.md
++++ /dev/null
+@@ -1,72 +0,0 @@
+-# OCPP 2.0.1 Configuration Manual: RFID Authentication
+-
+-This manual explains how to configure an OCPP 2.0.1 Charging Station (CP) to authenticate against the RFIDs of the organization it is assigned to in the TakoramaCharge portal.
+-
+----
+-
+-## 1. Prerequisites
+-- The Charging Station must be connected to the portal via the **OCPP 2.0.1** protocol.
+-- The Charging Station must be assigned to the correct **Organization** in the **Laddare** (Chargers) section of the portal.
+-
+----
+-
+-## 2. Assignment to Organization
+-Before configuring authentication, ensure the charger is correctly assigned:
+-1. Navigate to **Laddare** (Chargers).
+-2. Find the charger (check "Nya laddare" if it is new).
+-3. Click **Redigera** (Edit).
+-4. Select the correct **Organisation** and give it an **Alias**.
+-5. Click **Spara** (Save).
+-
+-*This assignment is crucial because the server uses it to determine which RFIDs are allowed to use this specific charger.*
+-
+----
+-
+-## 3. Configuring Authentication (OCPP 2.0.1)
+-To enable mandatory RFID authentication on the Charging Station, follow these steps:
+-
+-1. Navigate to **Live driftpanel** (Live Operations).
+-2. Select your Charging Station from the **Laddare** dropdown.
+-3. Select the command **Konfigurera (OCPP 2.0.1)** (SetVariables).
+-4. Enter the following values:
+-
+-| Field | Value | Description |
+-| :--- | :--- | :--- |
+-| **Komponent** | `AuthCtrlr` | The Authorization Controller component. |
+-| **Variabel** | `Enabled` | The variable that controls if auth is required. |
+-| **Värde** | `true` | Set to `true` to enable mandatory RFID check. |
+-
+-5. Click **Skicka kommando** (Send Command).
+-6. Wait for the status to show **Kommando klart**.
+-
+----
+-
+-## 4. Recommended Security Settings
+-To ensure maximum security and server-side control, we recommend setting these additional variables:
+-
+-### A. Authorize Remote Starts
+-Ensure that even starts from the portal or API are validated.
+-- **Component**: `AuthCtrlr`
+-- **Variable**: `AuthorizeRemoteStart`
+-- **Value**: `true`
+-
+-### B. Disable Offline Charging
+-If you want to prevent charging when the charger is offline (and cannot reach the server):
+-- **Component**: `AuthCtrlr`
+-- **Variable**: `LocalAuthorizeOffline`
+-- **Value**: `false`
+-
+-### C. Reject Unknown Tags Offline
+-- **Component**: `AuthCtrlr`
+-- **Variable**: `OfflineTxForUnknownIdEnabled`
+-- **Value**: `false`
+-
+----
+-
+-## 5. Troubleshooting
+-- **Charger does not request RFID**: Some chargers require a reboot after `Enabled` is changed. Send a **Reset (Hard)** command if necessary.
+-- **Authentication Failed**: Verify that the RFID tag is **Aktiv** (Active) and assigned to the **same Organization** as the charger.
+-- **Protocol Error**: Ensure the charger is connected using the **OCPP 2.0.1** sub-protocol. Check the "Uppdaterad" column in the Live panel; it should show recent activity.
+-
+----
+-*TakoramaCharge - OCPP 2.0.1 Implementation Guide*
+diff --git a/README_LOGGING.md b/README_LOGGING.md
+index 0cc17c4..4cd1550 100644
+--- a/README_LOGGING.md
++++ b/README_LOGGING.md
+@@ -143,7 +143,7 @@ You're reading this because...
+ 
+ ### **How to Access**
+ ✅ `./run.sh logs` (easiest)  
+-✅ `docker compose logs <service>` (direct)  
++✅ `docker logs <service>` (direct)  
+ ✅ `/data/logs/*.log` (if persistent logging enabled)
+ 
+ ### **How to Identify Fault**
+@@ -300,15 +300,15 @@ A: Not built-in. Use command line or set up Grafana Loki (advanced)
+ ### **Before Contacting Support, Gather:**
+ ```bash
+ # 1. Save logs
+-docker compose logs api-service > support_logs_api.txt 2>&1
+-docker compose logs ocpp-ws-service > support_logs_ocpp.txt 2>&1
+-docker compose logs redis-service > support_logs_redis.txt 2>&1
++docker logs api-service > support_logs_api.txt 2>&1
++docker logs ocpp-ws-service > support_logs_ocpp.txt 2>&1
++docker logs redis-service > support_logs_redis.txt 2>&1
+ 
+ # 2. Run diagnostics
+ bash diagnose_outage.sh > support_diagnosis.txt 2>&1
+ 
+ # 3. Check status
+-docker compose ps > support_status.txt
++docker compose -f docker-compose.yml ps > support_status.txt
+ 
+ # Send these files to support with timestamp of outage
+ ```
+diff --git a/evcsms/api.py b/evcsms/api.py
+index 9c25669..13deeb4 100644
+--- a/evcsms/api.py
++++ b/evcsms/api.py
+@@ -108,28 +108,13 @@ def load_json(path: Path, default):
+     try:
+         if not path.exists():
+             return default
+-        content = path.read_text(encoding="utf-8").strip()
+-        if not content:
+-            return default
+-        return json.loads(content)
++        return json.loads(path.read_text(encoding="utf-8"))
+     except Exception as e:
+         logger.error(f"Failed to load JSON from {path}: {e}")
+-        if path.exists():
+-            # If file exists but is corrupted, raise error to prevent wiping it with empty data
+-            raise RuntimeError(f"JSON file {path} exists but is corrupted or unreadable") from e
+         return default
+ 
+ def save_json(path: Path, data):
+-    tmp_path = path.with_suffix(f".tmp.{uuid.uuid4().hex}")
+-    try:
+-        tmp_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+-        os.replace(tmp_path, path)
+-    except Exception as e:
+-        logger.error(f"Failed to save JSON to {path}: {e}")
+-        if tmp_path.exists():
+-            try: tmp_path.unlink()
+-            except: pass
+-        raise
++    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+ 
+ def load_transactions() -> List[dict]:
+     return load_json(TRANSACTIONS_FILE, [])
+@@ -281,28 +266,18 @@ def normalize_cps_map(raw: dict) -> dict:
+     return out
+ 
+ def display_name_for_tag(tag: str, users_map: dict) -> str:
+-    tag = normalize_tag(tag)
+-    rfids_map = load_rfids_map()
+-    rfid = rfids_map.get(tag, {})
+-    alias = (rfid.get("alias") or "").strip()
+-    
+     u = users_map.get(tag, {})
+     if not u:
++        rfid = load_rfids_map().get(normalize_tag(tag), {})
+         email = (rfid.get("user_email") or "").strip().lower()
+         _, u = find_user_by_email(users_map, email)
+-    
+-    name = ""
+-    if u:
+-        if u.get("name"):
+-            name = str(u["name"]).strip()
+-        else:
+-            fn = (u.get("first_name") or "").strip()
+-            ln = (u.get("last_name") or "").strip()
+-            name = (fn + " " + ln).strip()
+-    
+-    if name and alias and alias != tag:
+-        return f"{name} ({alias})"
+-    return name or alias or tag
++        if not u:
++            return rfid.get("alias") or tag
++    if u.get("name"):
++        return u["name"]
++    fn = (u.get("first_name") or "").strip()
++    ln = (u.get("last_name") or "").strip()
++    return (fn + " " + ln).strip() or tag
+ 
+ def iso_now() -> str:
+     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+@@ -405,31 +380,9 @@ def require_installer_or_higher(s=Depends(get_session)):
+         raise HTTPException(403, "Portal admin or installer required")
+     return s
+ 
+-async def require_installer_or_api_key(request: Request, api_key: Optional[str] = Query(None)):
+-    # Try session first
+-    token = request.cookies.get("session")
+-    if token:
+-        try:
+-            session = verify_token(token)
+-            if (session.get("role") or "").lower() in ("portal_admin", "admin", "installer"):
+-                return session
+-        except:
+-            pass
+-
+-    # Try API key
+-    if api_key:
+-        ext_key = validate_external_api_key(request, api_key)
+-        return {
+-            "email": f"api_key:{ext_key['key_hash'][:8]}",
+-            "role": "installer",
+-            "org_id": ext_key["org_id"]
+-        }
+-
+-    raise HTTPException(401, "Not authenticated (valid session or api_key required)")
+-
+ def require_org_admin_or_portal(s=Depends(get_session)):
+-    if (s.get("role") or "").lower() not in ("org_admin", "portal_admin", "admin"):
+-        raise HTTPException(403, "Admin/org_admin required")
++    if (s.get("role") or "").lower() not in ("org_admin", "portal_admin", "admin", "installer"):
++        raise HTTPException(403, "Admin/org_admin or installer required")
+     return s
+ 
+ # =====================================================================
+@@ -623,15 +576,6 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
+             "id": _as_int(payload.get("id", 1), "id", minimum=1)
+         }
+ 
+-    if command == "set_variables":
+-        vars_list = payload.get("variables")
+-        if not isinstance(vars_list, list):
+-            raise HTTPException(400, "variables måste vara en lista")
+-        for v in vars_list:
+-            if not isinstance(v, dict) or "component" not in v or "variable" not in v or "value" not in v:
+-                raise HTTPException(400, "Varje variabel måste ha component, variable och value")
+-        return {"variables": vars_list}
+-
+     raise HTTPException(400, f"Ogiltigt command: {command}")
+ 
+ 
+@@ -1122,7 +1066,7 @@ async def api_portal_live_chargers(org_id: Optional[str] = None, session=Depends
+     }
+ 
+ @app.post("/api/portal/ocpp/command")
+-async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require_installer_or_api_key)):
++async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require_installer_or_higher)):
+     cp_id = (body.cp_id or "").strip()
+     command = (body.command or "").strip().lower()
+ 
+@@ -1131,12 +1075,6 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
+     if not command:
+         raise HTTPException(400, "command krävs")
+ 
+-    # Org check
+-    org_id = session.get("org_id")
+-    if org_id:
+-        if org_for_cp(cp_id) != org_id:
+-            raise HTTPException(403, "Du har inte behörighet att styra denna laddare")
+-
+     allowed_commands = {
+         "reset",
+         "change_availability",
+@@ -1147,7 +1085,6 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
+         "remote_stop_transaction",
+         "get_configuration",
+         "set_display_message",
+-        "set_variables",
+     }
+     if command not in allowed_commands:
+         raise HTTPException(400, f"Ogiltigt command. Tillåtna: {', '.join(sorted(allowed_commands))}")
+@@ -1187,7 +1124,7 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
+     return {"ok": True, "command_id": command_id, "status": "queued"}
+ 
+ @app.get("/api/portal/ocpp/command/{command_id}")
+-async def api_portal_ocpp_command_status(command_id: str, session=Depends(require_installer_or_api_key)):
++async def api_portal_ocpp_command_status(command_id: str, session=Depends(require_installer_or_higher)):
+     raw = redis_client.get(f"ocpp:command_result:{command_id}")
+     if not raw:
+         raise HTTPException(404, "Kommandoresultat saknas eller har löpt ut")
+@@ -2550,21 +2487,11 @@ def _allowed_tags_for_session(session: dict, users_map: dict) -> Optional[Set[st
+     role = session.get("role")
+     if role in ("portal_admin", "admin", "installer"):
+         return None
+-    
+-    oid = session.get("org_id")
+     if role == "org_admin":
+-        # Allow tags from rfids.json belonging to this org
+-        tags = {normalize_tag(t) for t, r in rfids.items() if (r.get("org_id") or "default") == oid}
+-        # Also allow tags from users.json belonging to this org (legacy fallback)
+-        tags.update({normalize_tag(t) for t, u in users_map.items() if (u.get("org_id") or "default") == oid})
+-        return tags
+-    
+-    email = (session.get("email") or "").strip().lower()
+-    # User's own tags from rfids.json
+-    tags = {normalize_tag(t) for t, r in rfids.items() if (r.get("user_email") or "").strip().lower() == email}
+-    # User's own tags from users.json (legacy fallback)
+-    tags.update({normalize_tag(t) for t, u in users_map.items() if (u.get("email") or "").strip().lower() == email})
+-    return tags
++        oid = session.get("org_id")
++        return {normalize_tag(t) for t, r in rfids.items() if (r.get("org_id") or "default") == oid}
++    email = (session.get("email") or "")
++    return {normalize_tag(t) for t, r in rfids.items() if (r.get("user_email") or "").strip().lower() == email.strip().lower()}
+ 
+ 
+ def _history_rows_for_session(days: int, tag: Optional[str], session: dict) -> List[dict]:
+@@ -2573,65 +2500,34 @@ def _history_rows_for_session(days: int, tag: Optional[str], session: dict) -> L
+     txs = load_transactions()
+     users_map = load_users_map()
+     allowed = _allowed_tags_for_session(session, users_map)
+-    session_org_id = session.get("org_id")
+ 
+     rows = []
+     for tx in txs:
+         stop = tx.get("stop_time")
+         if not stop or tx.get("meter_stop") is None:
+             continue
+-        
+-        try:
+-            stop_dt = datetime.fromisoformat(str(stop).replace("Z", "+00:00"))
+-            if stop_dt < cutoff:
+-                continue
+-        except Exception:
++        stop_dt = datetime.fromisoformat(stop.replace("Z", "+00:00"))
++        if stop_dt < cutoff:
+             continue
+ 
+-        tg = normalize_tag(tx.get("id_tag") or tx.get("tag") or "")
++        tg = normalize_tag(tx.get("id_tag") or "")
+         if tag and tg != normalize_tag(tag):
+             continue
+-        
+-        # Filtering for org_admin/user
+-        if allowed is not None:
+-            tx_org = tx.get("org_id")
+-            # If the transaction itself is marked with the user's org, show it
+-            if tx_org and tx_org == session_org_id:
+-                pass 
+-            # Otherwise, check if the tag belongs to the user's allowed set
+-            elif tg not in allowed:
+-                continue
+-
+-        try:
+-            m_stop = float(tx.get("meter_stop", 0))
+-            m_start = float(tx.get("meter_start", 0))
+-            e = (m_stop - m_start) / 1000.0
+-        except (TypeError, ValueError):
+-            e = 0.0
+-
+-        # Resolve org and alias for display
+-        tx_org_id = tx.get("org_id") or "default"
+-        orgs_map = load_orgs()
+-        tx_org_name = tx.get("org_name") or orgs_map.get(tx_org_id, {}).get("name") or tx_org_id
+-        
+-        cps_map = normalize_cps_map(load_cps_map())
+-        cp_meta = cps_map.get(tx.get("charge_point"), {})
+-        cp_alias = cp_meta.get("alias") or tx.get("charge_point") or "Unknown"
++        if allowed is not None and tg not in allowed:
++            continue
+ 
++        e = (tx["meter_stop"] - tx["meter_start"]) / 1000.0
+         rows.append({
+             "tag": tg,
+             "name": display_name_for_tag(tg, users_map),
+-            "charge_point": tx.get("charge_point") or "Unknown",
+-            "charge_point_alias": cp_alias,
+-            "connectorId": tx.get("connectorId") or 1,
++            "charge_point": tx.get("charge_point"),
++            "connectorId": tx.get("connectorId"),
+             "start_time": tx.get("start_time"),
+             "stop_time": tx.get("stop_time"),
+             "energy_kwh": round(max(0.0, e), 3),
+-            "org_id": tx_org_id,
+-            "org_name": tx_org_name,
+         })
+ 
+-    rows.sort(key=lambda r: str(r.get("stop_time") or ""), reverse=True)
++    rows.sort(key=lambda r: r["stop_time"] or "", reverse=True)
+     return rows
+ 
+ @app.get("/api/users/summary")
+@@ -2647,29 +2543,15 @@ async def api_users_summary(days: int = 30, session=Depends(require_auth)):
+         stop = tx.get("stop_time")
+         if not stop or tx.get("meter_stop") is None:
+             continue
+-        try:
+-            stop_dt = datetime.fromisoformat(str(stop).replace("Z", "+00:00"))
+-            if stop_dt < cutoff:
+-                continue
+-        except Exception:
++        stop_dt = datetime.fromisoformat(stop.replace("Z", "+00:00"))
++        if stop_dt < cutoff:
+             continue
+ 
+-        tag = normalize_tag(tx.get("id_tag") or tx.get("tag") or "")
+-        tx_org = tx.get("org_id")
+-        
+-        if allowed is not None:
+-            if tx_org and tx_org == session.get("org_id"):
+-                pass
+-            elif tag not in allowed:
+-                continue
++        tag = normalize_tag(tx.get("id_tag") or "")
++        if allowed is not None and tag not in allowed:
++            continue
+ 
+-        try:
+-            m_stop = float(tx.get("meter_stop", 0))
+-            m_start = float(tx.get("meter_start", 0))
+-            e = (m_stop - m_start) / 1000.0
+-        except (TypeError, ValueError):
+-            e = 0.0
+-            
++        e = (tx["meter_stop"] - tx["meter_start"]) / 1000.0
+         nm = display_name_for_tag(tag, users_map)
+         row = summary.setdefault(tag, {"kwh": 0.0, "sessions": 0, "name": nm})
+         row["kwh"] += max(0.0, e)
+@@ -2758,23 +2640,15 @@ async def api_my_summary(days: int = 30, session=Depends(require_auth)):
+         stop = tx.get("stop_time")
+         if not stop or tx.get("meter_stop") is None:
+             continue
+-        try:
+-            stop_dt = datetime.fromisoformat(str(stop).replace("Z", "+00:00"))
+-            if stop_dt < cutoff:
+-                continue
+-        except Exception:
++        stop_dt = datetime.fromisoformat(stop.replace("Z", "+00:00"))
++        if stop_dt < cutoff:
+             continue
+ 
+-        if normalize_tag(tx.get("id_tag") or tx.get("tag") or "") not in my_tags:
++        if normalize_tag(tx.get("id_tag") or "") not in my_tags:
+             continue
+ 
+-        try:
+-            m_stop = float(tx.get("meter_stop", 0))
+-            m_start = float(tx.get("meter_start", 0))
+-            total += max(0.0, (m_stop - m_start) / 1000.0)
+-            count += 1
+-        except (TypeError, ValueError):
+-            continue
++        total += max(0.0, (tx["meter_stop"] - tx["meter_start"]) / 1000.0)
++        count += 1
+ 
+     return {
+         "period_days": days,
+diff --git a/evcsms/app/api_keys.py b/evcsms/app/api_keys.py
+index 4711fb6..780a9a1 100644
+--- a/evcsms/app/api_keys.py
++++ b/evcsms/app/api_keys.py
+@@ -37,31 +37,19 @@ class ApiKeyManager:
+     
+     def load(self) -> None:
+         """Load API keys from disk."""
+-        if not self._path.exists():
+-            self._keys = {}
+-            return
+-        try:
+-            content = self._path.read_text(encoding="utf-8").strip()
+-            if not content:
++        if self._path.exists():
++            try:
++                data = json.loads(self._path.read_text(encoding="utf-8"))
++                self._keys = data
++            except Exception:
+                 self._keys = {}
+-                return
+-            self._keys = json.loads(content)
+-        except Exception as e:
+-            # Prevent wiping the file if it exists but can't be loaded
+-            raise RuntimeError(f"API keys file {self._path} exists but is corrupted: {e}")
++        else:
++            self._keys = {}
+     
+     def _save(self) -> None:
+-        """Save API keys to disk atomically."""
++        """Save API keys to disk."""
+         self._path.parent.mkdir(parents=True, exist_ok=True)
+-        tmp_path = self._path.with_suffix(f".tmp.{uuid.uuid4().hex}")
+-        try:
+-            tmp_path.write_text(json.dumps(self._keys, indent=2, ensure_ascii=False), encoding="utf-8")
+-            os.replace(tmp_path, self._path)
+-        except Exception:
+-            if tmp_path.exists():
+-                try: tmp_path.unlink()
+-                except: pass
+-            raise
++        self._path.write_text(json.dumps(self._keys, indent=2, ensure_ascii=False), encoding="utf-8")
+     
+     def _hash_key(self, raw_key: str) -> str:
+         """Hash API key using SHA256."""
+diff --git a/evcsms/app/auth_store.py b/evcsms/app/auth_store.py
+index d7146af..7123ff7 100644
+--- a/evcsms/app/auth_store.py
++++ b/evcsms/app/auth_store.py
+@@ -1,8 +1,6 @@
+ # app/auth_store.py
+ from __future__ import annotations
+ import json
+-import os
+-import uuid
+ from pathlib import Path
+ from threading import RLock
+ from typing import Set, List
+@@ -20,31 +18,18 @@ class AuthStore:
+ 
+     def load(self) -> None:
+         with self._lock:
+-            if not self._path.exists():
+-                self._tags = set()
+-                return
+-            try:
+-                content = self._path.read_text(encoding="utf-8").strip()
+-                if not content:
++            if self._path.exists():
++                try:
++                    data = json.loads(self._path.read_text(encoding="utf-8"))
++                    self._tags = {str(t).strip() for t in data}
++                except Exception:
+                     self._tags = set()
+-                    return
+-                data = json.loads(content)
+-                self._tags = {str(t).strip() for t in data}
+-            except Exception as e:
+-                # If file exists but is corrupted, we don't want to continue and risk wiping it
+-                raise RuntimeError(f"Auth file {self._path} exists but is corrupted: {e}")
++            else:
++                self._tags = set()
+ 
+     def _save_unlocked(self) -> None:
+         self._path.parent.mkdir(parents=True, exist_ok=True)
+-        tmp_path = self._path.with_suffix(f".tmp.{uuid.uuid4().hex}")
+-        try:
+-            tmp_path.write_text(json.dumps(sorted(self._tags), indent=2), encoding="utf-8")
+-            os.replace(tmp_path, self._path)
+-        except Exception:
+-            if tmp_path.exists():
+-                try: tmp_path.unlink()
+-                except: pass
+-            raise
++        self._path.write_text(json.dumps(sorted(self._tags), indent=2), encoding="utf-8")
+ 
+     def save(self) -> None:
+         with self._lock:
+diff --git a/evcsms/app/history_export.py b/evcsms/app/history_export.py
+index 7d1372c..04a7b24 100644
+--- a/evcsms/app/history_export.py
++++ b/evcsms/app/history_export.py
+@@ -91,25 +91,18 @@ def find_user_by_email(users_map: Dict[str, dict], email: str | None) -> Tuple[s
+ 
+ def display_name_for_tag(tag: str, users_map: Dict[str, dict], rfids_map: Dict[str, dict]) -> str:
+     tag = normalize_tag(tag)
+-    rfid = rfids_map.get(tag) or {}
+-    alias = (rfid.get("alias") or "").strip()
+-
+     user = users_map.get(tag) or {}
+     if not user:
++        rfid = rfids_map.get(tag) or {}
+         _, user = find_user_by_email(users_map, rfid.get("user_email"))
+-
+-    name = ""
+-    if user:
+-        if user.get("name"):
+-            name = str(user["name"]).strip()
+-        else:
+-            fn = str(user.get("first_name") or "").strip()
+-            ln = str(user.get("last_name") or "").strip()
+-            name = f"{fn} {ln}".strip()
+-
+-    if name and alias and alias != tag:
+-        return f"{name} ({alias})"
+-    return name or alias or tag or "Unknown"
++        if not user:
++            return (rfid.get("alias") or tag or "Unknown").strip() or "Unknown"
++    if user.get("name"):
++        return str(user["name"]).strip()
++    first_name = str(user.get("first_name") or "").strip()
++    last_name = str(user.get("last_name") or "").strip()
++    full_name = f"{first_name} {last_name}".strip()
++    return full_name or tag or "Unknown"
+ 
+ 
+ def resolve_transaction_snapshot(
+diff --git a/evcsms/config/.gitkeep b/evcsms/config/.gitkeep
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/evcsms/config/api_keys.json b/evcsms/config/api_keys.json
+index 22fb167..b6e58ff 100644
+--- a/evcsms/config/api_keys.json
++++ b/evcsms/config/api_keys.json
+@@ -1,4 +1,17 @@
+ {
++<<<<<<< HEAD
++  "acc834f25efd84cad771e4e7cde66e2fa0bca73a091c5890580acb6b1ba3b3cf": {
++    "org_id": "Takorama_Storås",
++    "created_at": "2026-05-07T19:29:18.310897+00:00",
++=======
++  "773d1eef6d024e3dc5baa45e8a30becd7707850696a4e5a2ccf891d11da57a18": {
++    "org_id": "Takorama_Storås",
++    "created_at": "2026-05-07T16:05:13.015529+00:00",
++    "last_used": null,
++    "rate_limit": 120,
++    "active": true,
++    "ip_whitelist": []
++  },
+   "29064e7ac2cd5690d681f06542a986aea91af783e5f3d925d6a9d1ae9f659db1": {
+     "org_id": "kaefer_std",
+     "created_at": "2026-05-07T18:42:32.815725+00:00",
+@@ -9,10 +22,12 @@
+   "8aa3f491053d56e7a662b97970c2e9e49b516786b5a8794e2e4f4780cc9dfd4f": {
+     "org_id": "Takorama_Storås",
+     "created_at": "2026-05-08T12:41:55.275741+00:00",
++>>>>>>> d985dbddc2fa58363b0b9c64fae8519727c9de4f
+     "last_used": null,
+     "rate_limit": 120,
+     "ip_whitelist": [],
+     "active": true
++<<<<<<< HEAD
+   },
+   "f4d0d52b40f7959b6986c1b39a8a3539c60b9ef1052b9c529d9ea688896d6c0b": {
+     "org_id": "Takorama_Storås",
+@@ -21,5 +36,7 @@
+     "rate_limit": 1000,
+     "ip_whitelist": [],
+     "active": true
++=======
++>>>>>>> d985dbddc2fa58363b0b9c64fae8519727c9de4f
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/evcsms/config/auth_tags.json b/evcsms/config/auth_tags.json
+index 3465ed9..9a2ff7a 100644
+--- a/evcsms/config/auth_tags.json
++++ b/evcsms/config/auth_tags.json
+@@ -1,32 +1,31 @@
+ [
+-  "F826879F",
+-  "222222",
+-  "8Y2OJPDQIHH2",
++  "04AABBCCDD",
+   "12345678",
+-  "UNSET-E7BFFBBB",
+-  "3BFD718A",
+-  "UNSET-3E78C7D9",
+-  "UNSET-43A8B2B0",
+   "12345687",
+-  "3BFDE18A",
+-  "UNSET-BC0C2AD3",
+-  "E3884WAS",
+-  "34JJH3UH3",
+-  "66666666",
+   "3A151BB2",
+-  "ADMIN",
+-  "E364657HJSH",
+-  "7BA28F8A",
+-  "8B3D028A",
+-  "3333333",
+-  "C8D00B9F",
++  "3B83EF8A",
++  "3BE7228A",
+   "3BFC7C8A",
++  "3BFD718A",
++  "3BFDE18A",
+   "4BC5918A",
+-  "UNSET-E95A254F",
++  "7BA28F8A",
++  "8B3D028A",
+   "8B765C8A",
++  "8Y2OJPDQIHH2",
++  "ADMIN",
++  "C8D00B9F",
+   "E2003412012345678900",
+-  "3BE7228A",
+-  "04AABBCCDD",
+-  "3B83EF8A",
+-  "5BB6EA8A"
++<<<<<<< HEAD
++  "UNSET-3E78C7D9"
++=======
++  "E364657HJSH",
++  "E3884WAS",
++  "F826879F",
++  "UNSET-3E78C7D9",
++  "UNSET-43A8B2B0",
++  "UNSET-BC0C2AD3",
++  "UNSET-E7BFFBBB",
++  "UNSET-E95A254F"
++>>>>>>> d985dbddc2fa58363b0b9c64fae8519727c9de4f
+ ]
+\ No newline at end of file
+diff --git a/evcsms/config/cps.json b/evcsms/config/cps.json
+index e2e1b7a..ef695d8 100644
+--- a/evcsms/config/cps.json
++++ b/evcsms/config/cps.json
+@@ -1,24 +1,4 @@
+ {
+-  "demo-unassigned-01": {
+-    "org_id": "Takorama_Storås",
+-    "alias": "Laddare 1 baksida"
+-  },
+-  "demo-unassigned-02": {
+-    "org_id": "Takorama_Storås",
+-    "alias": "Laddare 2 baksida"
+-  },
+-  "demo-unassigned-03": {
+-    "org_id": "Takorama_Storås",
+-    "alias": "Ctek framsida"
+-  },
+-  "demo-unassigned-04": {
+-    "org_id": "Takorama_Storås",
+-    "alias": "Easee Framisda"
+-  },
+-  "demo-unassigned-05": {
+-    "org_id": "Takorama_Storås",
+-    "alias": "ChargeAmp framsida"
+-  },
+   "ocpp/40637K50W4722229": {
+     "org_id": "Takorama_Storås",
+     "alias": "Ctek Framsida"
+diff --git a/evcsms/config/orgs.json b/evcsms/config/orgs.json
+index 5dece3e..1978cee 100644
+--- a/evcsms/config/orgs.json
++++ b/evcsms/config/orgs.json
+@@ -8,4 +8,4 @@
+   "kaefer_std": {
+     "name": "Kaefer Stora Höga"
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/evcsms/config/rfids.json b/evcsms/config/rfids.json
+index 817b403..52da944 100644
+--- a/evcsms/config/rfids.json
++++ b/evcsms/config/rfids.json
+@@ -34,34 +34,6 @@
+     "active": true,
+     "updated_at": "2026-03-24T17:24:26.204847Z"
+   },
+-  "66666666": {
+-    "alias": "2",
+-    "org_id": "default",
+-    "user_email": null,
+-    "active": true,
+-    "updated_at": "2026-03-21T20:55:46.788687Z"
+-  },
+-  "3333333": {
+-    "alias": "4",
+-    "org_id": "kaefer_std",
+-    "user_email": null,
+-    "active": true,
+-    "updated_at": "2026-03-21T20:56:23.073902Z"
+-  },
+-  "222222": {
+-    "alias": "3",
+-    "org_id": "kaefer_std",
+-    "user_email": null,
+-    "active": true,
+-    "updated_at": "2026-03-21T20:56:14.320090Z"
+-  },
+-  "E3884WAS": {
+-    "alias": "test1",
+-    "org_id": "Takorama_Storås",
+-    "user_email": "linn@dahlstrom.se",
+-    "active": true,
+-    "updated_at": "2026-03-24T17:24:39.144265Z"
+-  },
+   "34JJH3UH3": {
+     "alias": "test2",
+     "org_id": "Takorama_Storås",
+@@ -90,13 +62,6 @@
+     "active": true,
+     "updated_at": "2026-03-21T20:59:48.584806Z"
+   },
+-  "UNSET-BC0C2AD3": {
+-    "alias": "UNSET-BC0C2AD3",
+-    "org_id": "Takorama_Storås",
+-    "user_email": "sodia.mereus@gmail.com",
+-    "active": true,
+-    "updated_at": "2026-03-22T09:37:05.433616Z"
+-  },
+   "UNSET-3E78C7D9": {
+     "alias": "UNSET-3E78C7D9",
+     "org_id": "Takorama_Storås",
+@@ -132,13 +97,6 @@
+     "active": true,
+     "updated_at": "2026-03-22T17:57:43.060099Z"
+   },
+-  "F826879F": {
+-    "alias": "5",
+-    "org_id": "Takorama_Storås",
+-    "user_email": null,
+-    "active": true,
+-    "updated_at": "2026-03-22T17:57:43.060106Z"
+-  },
+   "8B765C8A": {
+     "alias": "6",
+     "org_id": "Takorama_Storås",
+@@ -167,6 +125,14 @@
+     "active": true,
+     "updated_at": "2026-03-26T08:35:04.429633Z"
+   },
++<<<<<<< HEAD
++  "3A151BB2": {
++    "alias": "5",
++    "org_id": "Takorama_Storås",
++    "user_email": "peter.persson@takorama.se",
++    "active": true,
++    "updated_at": "2026-05-08T13:14:48.208721Z"
++=======
+   "UNSET-E95A254F": {
+     "alias": "UNSET-E95A254F",
+     "org_id": "default",
+@@ -180,5 +146,6 @@
+     "user_email": "info@takorama.se",
+     "active": true,
+     "updated_at": "2026-05-09T19:27:44.172342Z"
++>>>>>>> d985dbddc2fa58363b0b9c64fae8519727c9de4f
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/evcsms/config/users.json b/evcsms/config/users.json
+index 7c9c655..519cc87 100644
+--- a/evcsms/config/users.json
++++ b/evcsms/config/users.json
+@@ -1,14 +1,4 @@
+ {
+-  "E3884WAS": {
+-    "first_name": "Linn",
+-    "last_name": "Dahlström",
+-    "name": "Linn Dahlström",
+-    "email": "linn@dahlstrom.se",
+-    "role": "user",
+-    "org_id": "Takorama_Storås",
+-    "pwd_salt": "5ZPbgtVEo5-nAh82XfMZHA",
+-    "pwd_hash": "g7-Mzm8wu7YvgecqkyUDaf0X0NZmScA-GIvbBxTzokQ"
+-  },
+   "8B3D028A": {
+     "first_name": "Hugo",
+     "last_name": "Danielsson",
+@@ -49,32 +39,6 @@
+     "pwd_salt": "y1EnOnrEt8TIwKBJzuUiMg",
+     "pwd_hash": "f470aGu3jNXCVUWcTp9rpRh7eowiIpW0aQrInzpU59s"
+   },
+-  "UNSET-E7BFFBBB": {
+-    "first_name": "Erik",
+-    "last_name": "Ek",
+-    "name": "Erik Ek",
+-    "email": "erik@example.com",
+-    "role": "org_admin",
+-    "org_id": "Takorama_Storås"
+-  },
+-  "E364657HJSH": {
+-    "first_name": "Anna",
+-    "last_name": "Andersson",
+-    "name": "Anna Andersson",
+-    "email": "anna@example.com",
+-    "role": "user",
+-    "org_id": "Takorama_Storås"
+-  },
+-  "UNSET-BC0C2AD3": {
+-    "first_name": "Sofia",
+-    "last_name": "Danielsson Mereus",
+-    "name": "Sofia Danielsson Mereus",
+-    "email": "sofia.mereus@gmail.com",
+-    "role": "user",
+-    "org_id": "Takorama_Storås",
+-    "pwd_salt": "F3WIeBq9n9Jxqe7oS7VKjg",
+-    "pwd_hash": "fCqK69wvNCROAX3S6wkqdhiZvrKs28eOFNdQR4AT0AM"
+-  },
+   "UNSET-3E78C7D9": {
+     "first_name": "Fredrik",
+     "last_name": "Melander",
+@@ -85,16 +49,6 @@
+     "pwd_salt": "YPyWTW0hhSfTAIIG7UdTPg",
+     "pwd_hash": "x4dJ6OYgpJzov6GpCyoqUewNoAhu9qf1ohLAi0ceMiY"
+   },
+-  "34JJH3UH3": {
+-    "first_name": "Hannele",
+-    "last_name": "Danielsson Mereus",
+-    "name": "Hannele Danielsson Mereus",
+-    "email": "rutstina95@gmail.com",
+-    "role": "user",
+-    "org_id": "Takorama_Storås",
+-    "pwd_salt": "ZNwo6p7vR8V2p61lGNty8g",
+-    "pwd_hash": "f2wADAcQkTJHPT-RowgFAyxeiSAgVWerSy6mxUCCEgY"
+-  },
+   "C8D00B9F": {
+     "first_name": "org",
+     "last_name": "admin",
+@@ -105,13 +59,15 @@
+     "pwd_salt": "ymgeZ00lIuOR6_W5gX3s4w",
+     "pwd_hash": "LzaUI43RzsxK6qFwODKqSGNl9FJ0_gYFfhYG4aZrZT8"
+   },
+-  "5BB6EA8A": {
+-    "first_name": "magnus",
+-    "last_name": "mustachAB",
+-    "name": "magnus mustachAB",
+-    "email": "mustach@mycket.se",
++  "3A151BB2": {
++    "first_name": "Peter",
++    "last_name": "Persson",
++    "name": "Peter Persson",
++    "email": "peter.persson@takorama.se",
+     "role": "user",
+     "org_id": "Takorama_Storås",
++    "pwd_salt": "hVytPWJIhCK241njI6sqwQ",
++    "pwd_hash": "W23vBzHNVNkf8whycnzQOHQ8XypgllFMExWUvND5d7c"
+     "pwd_salt": "r99_9YVWps76ObwtMJySrQ",
+     "pwd_hash": "uOUq530JV6DWmHnAqcpWbtsPQImTl8DUyG3LBFimZUQ"
+   },
+@@ -124,15 +80,5 @@
+     "org_id": "Takorama_Storås",
+     "pwd_salt": "1c7IAYZf_13HJXoLSHMNuw",
+     "pwd_hash": "CaRgxZ_YssF85L5UELrM82i4_s9GOOxbHIXU6TZA6g8"
+-  },
+-  "3A151BB2": {
+-    "first_name": "Peter",
+-    "last_name": "Persson",
+-    "name": "Peter Persson",
+-    "email": "peter.persson@takorama.se",
+-    "role": "user",
+-    "org_id": "Takorama_Storås",
+-    "pwd_salt": "r99_9YVWps76ObwtMJySrQ",
+-    "pwd_hash": "uOUq530JV6DWmHnAqcpWbtsPQImTl8DUyG3LBFimZUQ"
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/evcsms/diagnose_outage.sh b/evcsms/diagnose_outage.sh
+index 200d56c..c6597f2 100755
+--- a/evcsms/diagnose_outage.sh
++++ b/evcsms/diagnose_outage.sh
+@@ -56,18 +56,18 @@ echo ""
+ # ============================================
+ echo -e "${YELLOW}[2/6] Testing Redis Connectivity...${NC}"
+ 
+-if docker compose exec redis-service redis-cli ping > /dev/null 2>&1; then
++if docker exec redis-service redis-cli ping > /dev/null 2>&1; then
+     echo -e "${GREEN}✓ Redis is responding${NC}"
+-    REDIS_INFO=$(docker compose exec redis-service redis-cli INFO server | grep redis_version | cut -d: -f2 | tr -d '\r')
++    REDIS_INFO=$(docker exec redis-service redis-cli INFO server | grep redis_version | cut -d: -f2 | tr -d '\r')
+     echo "  Version: $REDIS_INFO"
+ else
+     echo -e "${RED}✗ Redis is NOT responding${NC}"
+     echo -e "  ${YELLOW}This causes complete system failure.${NC}"
+     echo ""
+     echo "  Trying to restart Redis..."
+-    docker compose restart redis-service 2>/dev/null || echo "  Failed to restart"
++    docker restart redis-service 2>/dev/null || echo "  Failed to restart"
+     sleep 2
+-    if docker compose exec redis-service redis-cli ping > /dev/null 2>&1; then
++    if docker exec redis-service redis-cli ping > /dev/null 2>&1; then
+         echo -e "  ${GREEN}✓ Redis restarted successfully${NC}"
+     else
+         echo -e "  ${RED}✗ Redis still not responding - CHECK PROVIDER${NC}"
+@@ -89,7 +89,7 @@ else
+     echo -e "${RED}✗ API not responding (HTTP $API_RESPONSE)${NC}"
+     echo -e "  ${YELLOW}Checking API service logs...${NC}"
+     echo ""
+-    docker compose logs --tail=20 api-service 2>&1 | tail -10
++    docker logs --tail=20 api-service 2>&1 | tail -10
+ fi
+ echo ""
+ 
+@@ -103,12 +103,12 @@ SERVICES=("api-service" "ocpp-ws-service" "redis-service" "backup-service")
+ ERROR_FOUND=0
+ 
+ for SERVICE in "${SERVICES[@]}"; do
+-    ERROR_COUNT=$(docker compose logs --tail=200 $SERVICE 2>&1 | grep -i "error\|exception\|failed\|crashed" | wc -l)
++    ERROR_COUNT=$(docker logs --tail=200 $SERVICE 2>&1 | grep -i "error\|exception\|failed\|crashed" | wc -l)
+     if [ $ERROR_COUNT -gt 0 ]; then
+         ERROR_FOUND=1
+         echo -e "${RED}$SERVICE: Found $ERROR_COUNT error(s)${NC}"
+         echo "  Recent errors:"
+-        docker compose logs --tail=50 $SERVICE 2>&1 | grep -i "error\|exception\|failed\|crashed" | head -3 | sed 's/^/  /'
++        docker logs --tail=50 $SERVICE 2>&1 | grep -i "error\|exception\|failed\|crashed" | head -3 | sed 's/^/  /'
+     fi
+ done
+ 
+@@ -213,10 +213,10 @@ if [ "$CHARGER_COUNT" = "0" ]; then
+ fi
+ 
+ echo "4. If issues persist, collect debug info:"
+-echo "   docker compose ps > debug_status.txt"
+-echo "   docker compose logs api-service >> debug_logs.txt 2>&1"
+-echo "   docker compose logs ocpp-ws-service >> debug_logs.txt 2>&1"
+-echo "   docker compose logs redis-service >> debug_logs.txt 2>&1"
++echo "   docker compose -f docker-compose.yml ps > debug_status.txt"
++echo "   docker logs api-service >> debug_logs.txt 2>&1"
++echo "   docker logs ocpp-ws-service >> debug_logs.txt 2>&1"
++echo "   docker logs redis-service >> debug_logs.txt 2>&1"
+ echo ""
+ echo "5. Then contact support with debug files."
+ echo ""
+diff --git a/evcsms/docker-compose.yml b/evcsms/docker-compose.yml
+index 15f3c54..2c0b965 100644
+--- a/evcsms/docker-compose.yml
++++ b/evcsms/docker-compose.yml
+@@ -1,14 +1,13 @@
+ services:
+   redis-service:
+     image: redis:7-alpine
++    container_name: redis-service
+     restart: unless-stopped
+     expose:
+       - "6379"
+     environment:
+       - REDIS_PASSWORD=${REDIS_PASSWORD}
+-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]
+-    volumes:
+-      - ./redis_data:/data
++    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+     healthcheck:
+       test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+       interval: 30s
+@@ -19,6 +18,7 @@ services:
+     build:
+       context: .
+       dockerfile: docker/Dockerfile.ocpp_ws
++    container_name: ocpp-ws-service
+     restart: unless-stopped
+     ports:
+       - "127.0.0.1:9000:9000"
+@@ -47,6 +47,7 @@ services:
+     build:
+       context: .
+       dockerfile: docker/Dockerfile.api
++    container_name: api-service
+     restart: unless-stopped
+     ports:
+       - "127.0.0.1:8000:8000"
+@@ -74,6 +75,7 @@ services:
+     build:
+       context: .
+       dockerfile: docker/Dockerfile.ui
++    container_name: ui-service
+     restart: unless-stopped
+     ports:
+       - "127.0.0.1:8080:80"
+@@ -90,6 +92,7 @@ services:
+     build:
+       context: .
+       dockerfile: docker/Dockerfile.backup
++    container_name: backup-service
+     restart: unless-stopped
+     environment:
+       - PYTHONPATH=/app
+diff --git a/evcsms/ocpp_ws.py b/evcsms/ocpp_ws.py
+index 84353d9..5310dec 100644
+--- a/evcsms/ocpp_ws.py
++++ b/evcsms/ocpp_ws.py
+@@ -8,13 +8,11 @@ import asyncio
+ import json
+ import logging
+ import os
+-import uuid
+ from datetime import datetime, timezone
+ from enum import Enum
+ from pathlib import Path
+ from typing import Dict, Optional
+ from urllib.parse import urlsplit, parse_qs
+-from dataclasses import asdict, is_dataclass
+ 
+ import websockets
+ from ocpp.routing import on
+@@ -106,8 +104,6 @@ def make_json_safe(value):
+         return value
+     if isinstance(value, Enum):
+         return value.value
+-    if is_dataclass(value):
+-        return make_json_safe(asdict(value))
+     if isinstance(value, dict):
+         return {str(k): make_json_safe(v) for k, v in value.items()}
+     if isinstance(value, (list, tuple, set)):
+@@ -146,31 +142,6 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
+                     }
+                 }
+             )
+-        if command == "set_variables":
+-            variables = payload.get("variables", [])
+-            set_var_data = []
+-            for v in variables:
+-                set_var_data.append({
+-                    "attributeValue": str(v.get("value")),
+-                    "component": {"name": v.get("component")},
+-                    "variable": {"name": v.get("variable")}
+-                })
+-            return call201.SetVariables(set_variable_data=set_var_data)
+-
+-        if command == "remote_start_transaction":
+-            id_tag = str(payload.get("id_tag", ""))
+-            evse_id = int(payload.get("connector_id", 1))
+-            return call201.RequestStartTransaction(
+-                id_token={"id_token": id_tag, "type": "ISO14443"},
+-                remote_start_id=int(uuid.uuid4().int % 2147483647),
+-                evse_id=evse_id
+-            )
+-
+-        if command == "remote_stop_transaction":
+-            return call201.RequestStopTransaction(
+-                transaction_id=str(payload.get("transaction_id", ""))
+-            )
+-
+         raise ValueError(f"Command {command} not implemented for OCPP 2.0.1")
+ 
+     if command == "reset":
+@@ -252,25 +223,8 @@ async def command_worker():
+                 continue
+ 
+             try:
+-                version = getattr(cp, "ocpp_version", "1.6")
+-                request = build_ocpp_call(command, payload, version)
++                request = build_ocpp_call(command, payload, getattr(cp, "ocpp_version", "1.6"))
+                 response = await cp.call(request)
+-                logger.info("[%s] Command %s response: %s", cp_id, command, make_json_safe(response))
+-
+-                # Track tags for remote starts if successful
+-                status = getattr(response, "status", "")
+-                if hasattr(status, "value"): status = status.value
+-                if str(status).lower() == "accepted":
+-                    if command == "remote_start_transaction":
+-                        id_tag = payload.get("id_tag")
+-                        connector_id = payload.get("connector_id")
+-                        if version == "2.0.1":
+-                            remote_start_id = getattr(request, "remote_start_id", None)
+-                            if hasattr(cp, "track_remote_start") and remote_start_id is not None:
+-                                cp.track_remote_start(remote_start_id, id_tag)
+-                        if hasattr(cp, "track_tag"):
+-                            cp.track_tag(id_tag, connector_id)
+-
+                 set_command_result(
+                     command_id,
+                     {
+@@ -323,30 +277,13 @@ async def wait_for_redis(retries: int = 15, delay_seconds: float = 2.0):
+ # =====================================================================
+ def load_json(path: Path, default):
+     try:
+-        if not path.exists():
+-            return default
+-        content = path.read_text(encoding="utf-8").strip()
+-        if not content:
+-            return default
+-        return json.loads(content)
+-    except Exception as e:
+-        logger.error(f"Failed to load JSON from {path}: {e}")
+-        if path.exists():
+-            raise RuntimeError(f"JSON file {path} exists but is corrupted or unreadable") from e
++        return json.loads(path.read_text(encoding="utf-8"))
++    except Exception:
+         return default
+ 
+ def save_json(path: Path, data):
+     path.parent.mkdir(parents=True, exist_ok=True)
+-    tmp_path = path.with_suffix(f".tmp.{uuid.uuid4().hex}")
+-    try:
+-        tmp_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+-        os.replace(tmp_path, path)
+-    except Exception as e:
+-        logger.error(f"Failed to save JSON to {path}: {e}")
+-        if tmp_path.exists():
+-            try: tmp_path.unlink()
+-            except: pass
+-        raise
++    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+ 
+ def normalize_tag(tag: str) -> str:
+     return (tag or "").strip().upper()
+@@ -392,7 +329,7 @@ def ensure_default_org():
+     orgs = load_json(ORGS_FILE, {})
+     if "default" not in orgs:
+         orgs["default"] = {"name": "Default"}
+-        save_json(ORGS_FILE, orgs)
++        ORGS_FILE.write_text(json.dumps(orgs, indent=2, ensure_ascii=False), encoding="utf-8")
+ 
+ def org_for_cp(cp_id: str) -> str:
+     """Returnera CP-org (om saknas → 'default')."""
+@@ -405,10 +342,9 @@ def org_for_cp(cp_id: str) -> str:
+ def is_tag_allowed_on_cp(tag: str, cp_id: str) -> bool:
+     """
+     Policy:
+-    - Taggen måste finnas i rfids.json eller users.json
+-    - Taggen måste vara aktiv
+-    - CP måste tillhöra samma org som användarens org (eller vara default)
+-    - Om PORTAL_TAGS_GLOBAL=true → portal_admin alltid accepterad på alla CP
++    - Taggen måste vara whitelistaD
++    - CP måste tillhöra samma org som användarens org
++    - Om PORTAL_TAGS_GLOBAL=true → portal_admin alltid accepterad
+     """
+     tag = normalize_tag(tag)
+     users = load_json(USERS_FILE, {})
+@@ -419,23 +355,25 @@ def is_tag_allowed_on_cp(tag: str, cp_id: str) -> bool:
+         if not bool(rfid.get("active", True)):
+             return False
+         user_email = (rfid.get("user_email") or "").strip().lower()
+-        u = find_user_by_email(users, user_email) if user_email else None
+-        
+-        tag_role = (u.get("role") if u else "user").lower()
+-        tag_org = (rfid.get("org_id") or (u.get("org_id") if u else "default") or "default").strip()
++        if not user_email:
++            return False
++        u = find_user_by_email(users, user_email)
++        if not u:
++            return False
++        tag_role = (u.get("role") or "user").lower()
++        tag_org = rfid.get("org_id") or u.get("org_id")
+     else:
+         # Legacy fallback: users keyed by RFID tag
+         u = users.get(tag)
+         if not u:
+-            # Okänd tagg
+             return False
+         tag_role = (u.get("role") or "user").lower()
+-        tag_org = (u.get("org_id") or "default").strip()
++        tag_org = u.get("org_id")
+ 
+     cp_org = org_for_cp(cp_id)
+ 
+     # Portal-admin override
+-    portal_global = os.getenv("PORTAL_TAGS_GLOBAL", "true").lower() in ("1", "true", "yes")
++    portal_global = os.getenv("PORTAL_TAGS_GLOBAL", "false").lower() in ("1", "true", "yes")
+     if portal_global and tag_role in ("portal_admin", "admin"):
+         return True
+ 
+@@ -449,47 +387,10 @@ class CentralSystemCP(CP):
+         super().__init__(cp_id, websocket)
+         self.redis = redis_client
+         self.ocpp_version = "1.6"
+-        self._last_id_tag = None
+-
+-    def track_tag(self, id_tag, connector_id=None):
+-        id_tag = normalize_tag(id_tag)
+-        if id_tag:
+-            self._last_id_tag = id_tag
+ 
+     @on(Action.boot_notification)
+     async def on_boot_notification(self, charge_point_vendor, charge_point_model, **kwargs):
+-        logger.info("[%s] BootNotification vendor=%s model=%s", self.id, charge_point_vendor, charge_point_model)
+-        
+-        # Store metadata in Redis and update cps.json if needed
+-        metadata = {
+-            "vendor": charge_point_vendor,
+-            "model": charge_point_model,
+-            "serial": kwargs.get("charge_point_serial_number") or kwargs.get("chargePointSerialNumber") or "Unknown",
+-            "firmware": kwargs.get("firmware_version") or kwargs.get("firmwareVersion") or "Unknown",
+-            "ocpp_version": "1.6",
+-            "last_boot": iso_now(),
+-        }
+-        self.redis.set(f"cp_metadata:{self.id}", json.dumps(metadata))
+-        
+-        try:
+-            cps = load_json(CPS_FILE, {})
+-            existing = cps.get(self.id, {})
+-            if isinstance(existing, str):
+-                existing = {"org_id": existing}
+-            
+-            # Update metadata in cps.json
+-            updated = False
+-            for k, v in metadata.items():
+-                if existing.get(k) != v:
+-                    existing[k] = v
+-                    updated = True
+-            
+-            if updated:
+-                cps[self.id] = existing
+-                save_json(CPS_FILE, cps)
+-        except Exception as e:
+-            logger.error("[%s] Failed to update cps.json with metadata: %s", self.id, e)
+-
++        logger.info("[%s] BootNotification", self.id)
+         return call_result.BootNotification(
+             current_time=iso_now(),
+             interval=30,
+@@ -503,7 +404,6 @@ class CentralSystemCP(CP):
+ 
+     @on(Action.status_notification)
+     async def on_status_notification(self, connector_id, status, error_code, **kwargs):
+-        logger.info("[%s] StatusNotification connector=%s status=%s", self.id, connector_id, status)
+         connector_id = int(connector_id)
+         status_key = f"connector_status:{self.id}:{connector_id}"
+         status_data = {
+@@ -516,11 +416,11 @@ class CentralSystemCP(CP):
+ 
+     @on(Action.authorize)
+     async def on_authorize(self, id_tag, **kwargs):
+-        id_tag = normalize_tag(id_tag)
+-        self.track_tag(id_tag)
+-        ok = is_tag_allowed_on_cp(id_tag, self.id)
++        auth_store = AuthStore(AUTH_FILE)
++        allowed = auth_store.contains(id_tag)
++        ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
+         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
+-        masked_tag = (id_tag[:4] + "***") if id_tag else "***"
++        masked_tag = (normalize_tag(id_tag)[:4] + "***") if normalize_tag(id_tag) else "***"
+         logger.info("[%s] Authorize id_tag=%s -> %s", self.id, masked_tag, status.value)
+         return call_result.Authorize(id_tag_info={"status": status})
+ 
+@@ -529,13 +429,11 @@ class CentralSystemCP(CP):
+         # Get next transaction ID from Redis
+         tx_id = self.redis.incr("next_tx_id")
+ 
+-        id_tag = normalize_tag(id_tag)
+-        ok = is_tag_allowed_on_cp(id_tag, self.id)
++        auth_store = AuthStore(AUTH_FILE)
++        allowed = auth_store.contains(id_tag)
++        ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
+         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
+ 
+-        masked_tag = (id_tag[:4] + "***") if id_tag else "***"
+-        logger.info("[%s] StartTransaction id_tag=%s -> %s", self.id, masked_tag, status.value)
+-
+         rfids = load_rfids_map()
+         rfid = rfids.get(normalize_tag(id_tag), {})
+ 
+@@ -568,7 +466,7 @@ class CentralSystemCP(CP):
+         try:
+             txs = load_json(TRANSACTIONS_FILE, [])
+             txs.append(entry)
+-            save_json(TRANSACTIONS_FILE, txs)
++            TRANSACTIONS_FILE.write_text(json.dumps(txs, indent=2, ensure_ascii=False), encoding="utf-8")
+         except Exception as e:
+             logger.error("Failed to save transaction: %s", e)
+ 
+@@ -579,7 +477,6 @@ class CentralSystemCP(CP):
+ 
+     @on(Action.stop_transaction)
+     async def on_stop_transaction(self, transaction_id, meter_stop, timestamp, **kwargs):
+-        logger.info("[%s] StopTransaction tx_id=%s", self.id, transaction_id)
+         tx_id = int(transaction_id)
+         tx_key = f"open_tx:{tx_id}"
+ 
+@@ -602,7 +499,7 @@ class CentralSystemCP(CP):
+                         break
+                 else:
+                     txs.append(entry)
+-                save_json(TRANSACTIONS_FILE, txs)
++                TRANSACTIONS_FILE.write_text(json.dumps(txs, indent=2, ensure_ascii=False), encoding="utf-8")
+             except Exception as e:
+                 logger.error("Failed to update transaction: %s", e)
+ 
+@@ -614,60 +511,10 @@ class CentralSystemCP201(CP201):
+         super().__init__(cp_id, websocket)
+         self.redis = redis_client
+         self.ocpp_version = "2.0.1"
+-        self._last_id_tag = None
+-        self._evse_tags = {}
+-        self._remote_start_tags = {}
+-
+-    def track_tag(self, id_tag, evse_id=None):
+-        id_tag = normalize_tag(id_tag)
+-        if id_tag:
+-            self._last_id_tag = id_tag
+-            if evse_id is not None:
+-                self._evse_tags[int(evse_id)] = id_tag
+-
+-    def track_remote_start(self, remote_start_id, id_tag):
+-        self._remote_start_tags[int(remote_start_id)] = normalize_tag(id_tag)
+ 
+     @on(Action201.boot_notification)
+     async def on_boot_notification(self, charging_station, reason, **kwargs):
+-        cs_dict = make_json_safe(charging_station)
+-        vendor = cs_dict.get("vendor_name") or cs_dict.get("vendorName") or "Unknown"
+-        model = cs_dict.get("model") or "Unknown"
+-        serial = cs_dict.get("serial_number") or cs_dict.get("serialNumber") or "Unknown"
+-        fw = cs_dict.get("firmware_version") or cs_dict.get("firmwareVersion") or "Unknown"
+-        
+-        logger.info("[%s] BootNotification (v2.0.1) from %s (%s) sn:%s fw:%s", self.id, vendor, model, serial, fw)
+-        
+-        # Store metadata in Redis and update cps.json if needed
+-        metadata = {
+-            "vendor": vendor,
+-            "model": model,
+-            "serial": serial,
+-            "firmware": fw,
+-            "ocpp_version": "2.0.1",
+-            "last_boot": iso_now(),
+-        }
+-        self.redis.set(f"cp_metadata:{self.id}", json.dumps(metadata))
+-        
+-        try:
+-            cps = load_json(CPS_FILE, {})
+-            existing = cps.get(self.id, {})
+-            if isinstance(existing, str):
+-                existing = {"org_id": existing}
+-            
+-            # Update metadata in cps.json
+-            updated = False
+-            for k, v in metadata.items():
+-                if existing.get(k) != v:
+-                    existing[k] = v
+-                    updated = True
+-            
+-            if updated:
+-                cps[self.id] = existing
+-                save_json(CPS_FILE, cps)
+-        except Exception as e:
+-            logger.error("[%s] Failed to update cps.json with metadata: %s", self.id, e)
+-
++        logger.info("[%s] BootNotification (v2.0.1) from %s", self.id, charging_station.get("vendorName"))
+         return call_result201.BootNotification(
+             current_time=iso_now(),
+             interval=30,
+@@ -676,17 +523,13 @@ class CentralSystemCP201(CP201):
+ 
+     @on(Action201.heartbeat)
+     async def on_heartbeat(self):
+-        logger.info("[%s] Heartbeat (v2.0.1)", self.id)
+         return call_result201.Heartbeat(current_time=iso_now())
+ 
+     @on(Action201.status_notification)
+-    async def on_status_notification(self, timestamp, connector_status, evse_id, connector_id=None, **kwargs):
+-        evse_id = int(evse_id)
+-        status_val = make_json_safe(connector_status)
+-        logger.info("[%s] StatusNotification (v2.0.1) evse=%s status=%s", self.id, evse_id, status_val)
++    async def on_status_notification(self, timestamp, connector_status, evse_id, connector_id, **kwargs):
+         status_key = f"connector_status:{self.id}:{evse_id}"
+         status_data = {
+-            "status": status_val,
++            "status": make_json_safe(connector_status),
+             "error": "NoError",
+             "timestamp": timestamp,
+         }
+@@ -695,32 +538,23 @@ class CentralSystemCP201(CP201):
+ 
+     @on(Action201.authorize)
+     async def on_authorize(self, id_token, **kwargs):
+-        token_dict = make_json_safe(id_token) if id_token else {}
+-        id_tag = normalize_tag(token_dict.get("id_token") or token_dict.get("idToken"))
+-        # evse_id is optional in Authorize
+-        evse_id = kwargs.get("evse_id")
+-        self.track_tag(id_tag, evse_id)
+-        ok = is_tag_allowed_on_cp(id_tag, self.id)
++        id_tag = id_token.get("idToken")
++        auth_store = AuthStore(AUTH_FILE)
++        allowed = auth_store.contains(id_tag)
++        ok = is_tag_allowed_on_cp(id_tag, self.id) if allowed else False
+         status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
+-        masked_tag = (id_tag[:4] + "***") if id_tag else "***"
++        masked_tag = (normalize_tag(id_tag)[:4] + "***") if normalize_tag(id_tag) else "***"
+         logger.info("[%s] Authorize (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
+         return call_result201.Authorize(id_token_info={"status": status})
+ 
+     @on(Action201.transaction_event)
+     async def on_transaction_event(self, event_type, timestamp, trigger_reason, seq_no, transaction_info, **kwargs):
+-        kwargs = make_json_safe(kwargs)
+-        tx_dict = make_json_safe(transaction_info)
+-        tx_id = tx_dict.get("transaction_id") or tx_dict.get("transactionId")
++        tx_id = transaction_info.get("transactionId")
+         event_type = make_json_safe(event_type)  # Get 'Started', 'Updated', 'Ended'
+-        logger.info("[%s] TransactionEvent type=%s tx_id=%s", self.id, event_type, tx_id)
+ 
+         # Update connector status if chargingState is present for UI compatibility
+-        charging_state = tx_dict.get("charging_state") or tx_dict.get("chargingState")
+-        
+-        # Safely extract evse_id
+-        evse_data = kwargs.get("evse") or {}
+-        evse_id = int(evse_data.get("id", 1))
+-
++        charging_state = make_json_safe(transaction_info.get("chargingState"))
++        evse_id = int(kwargs.get("evse", {}).get("id", 1))
+         if charging_state:
+             status_map = {
+                 "Charging": "Charging",
+@@ -744,44 +578,17 @@ class CentralSystemCP201(CP201):
+                 "timestamp": timestamp,
+             }))
+ 
+-        id_token_info = None
+         if event_type == "Started":
+-            id_token = kwargs.get("id_token")
+-            token_dict = make_json_safe(id_token) if id_token else {}
+-
+-            remote_start_id = kwargs.get("remote_start_id")
+-            remote_tag = self._remote_start_tags.get(int(remote_start_id)) if remote_start_id is not None else None
+-
+-            # Priority: 1. idToken in message, 2. remoteStartId association, 3. EVSE-specific tag, 4. last global tag
+-            id_tag = normalize_tag(
+-                token_dict.get("id_token") or 
+-                token_dict.get("idToken") or 
+-                remote_tag or
+-                self._evse_tags.get(evse_id) or 
+-                self._last_id_tag or 
+-                "unknown"
+-            )
+-            
+-            # Track it for future events in this transaction if needed
+-            self.track_tag(id_tag, evse_id)
+-
+-            # Perform authorization check
+-            ok = is_tag_allowed_on_cp(id_tag, self.id)
+-            status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
+-            id_token_info = {"status": status}
+-            
+-            masked_tag = (id_tag[:4] + "***") if id_tag != "UNKNOWN" else "UNKNOWN"
+-            logger.info("[%s] Transaction Started (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
+-
+-            meter_start = 0.0
+-            meter_values = kwargs.get("meter_value") or []
+-            for mv in meter_values:
+-                for sampled in (mv.get("sampled_value") or mv.get("sampledValue") or []):
+-                    measurand = sampled.get("measurand", "Energy.Active.Import.Register")
+-                    if measurand == "Energy.Active.Import.Register":
+-                        try:
++            id_token = kwargs.get("id_token", {})
++            id_tag = id_token.get("idToken", "unknown")
++            meter_start = 0
++            meter_value = kwargs.get("meter_value", [])
++            if meter_value:
++                # Try to find energy imported
++                for mv in meter_value:
++                    for sampled in mv.get("sampledValue", []):
++                        if sampled.get("measurand") == "Energy.Active.Import.Register":
+                             meter_start = float(sampled.get("value", 0))
+-                        except (ValueError, TypeError): pass
+ 
+             rfids = load_rfids_map()
+             rfid = rfids.get(normalize_tag(id_tag), {})
+@@ -789,7 +596,7 @@ class CentralSystemCP201(CP201):
+             entry = {
+                 "transaction_id": tx_id,
+                 "charge_point": self.id,
+-                "connectorId": evse_id,
++                "connectorId": int(kwargs.get("evse", {}).get("id", 1)),
+                 "id_tag": id_tag,
+                 "tag_alias": rfid.get("alias") or normalize_tag(id_tag),
+                 "user_email": rfid.get("user_email"),
+@@ -799,22 +606,19 @@ class CentralSystemCP201(CP201):
+                 "meter_stop": None
+             }
+ 
+-            try:
+-                entry = enrich_transaction_snapshot(
+-                    entry,
+-                    rfids_map=rfids,
+-                    cps_map=load_json(CPS_FILE, {}),
+-                    users_map=load_json(USERS_FILE, {}),
+-                    orgs_map=load_json(ORGS_FILE, {}),
+-                )
+-            except Exception as e:
+-                logger.error("Enrichment failed during 2.0.1 start: %s", e)
++            entry = enrich_transaction_snapshot(
++                entry,
++                rfids_map=rfids,
++                cps_map=load_json(CPS_FILE, {}),
++                users_map=load_json(USERS_FILE, {}),
++                orgs_map=load_json(ORGS_FILE, {}),
++            )
+ 
+             self.redis.set(f"open_tx:{tx_id}", json.dumps(entry))
+             try:
+                 txs = load_json(TRANSACTIONS_FILE, [])
+                 txs.append(entry)
+-                save_json(TRANSACTIONS_FILE, txs)
++                TRANSACTIONS_FILE.write_text(json.dumps(txs, indent=2, ensure_ascii=False), encoding="utf-8")
+             except Exception as e:
+                 logger.error("Failed to save 2.0.1 transaction: %s", e)
+ 
+@@ -825,15 +629,13 @@ class CentralSystemCP201(CP201):
+                 entry = json.loads(tx_data)
+                 entry["stop_time"] = timestamp
+                 
+-                meter_stop = entry.get("meter_start", 0.0)
+-                meter_values = kwargs.get("meter_value") or []
+-                for mv in meter_values:
+-                    for sampled in (mv.get("sampled_value") or mv.get("sampledValue") or []):
+-                        measurand = sampled.get("measurand", "Energy.Active.Import.Register")
+-                        if measurand == "Energy.Active.Import.Register":
+-                            try:
++                meter_stop = entry.get("meter_start", 0)
++                meter_value = kwargs.get("meter_value", [])
++                if meter_value:
++                    for mv in meter_value:
++                        for sampled in mv.get("sampledValue", []):
++                            if sampled.get("measurand") == "Energy.Active.Import.Register":
+                                 meter_stop = float(sampled.get("value", 0))
+-                            except (ValueError, TypeError): pass
+                 
+                 entry["meter_stop"] = meter_stop
+                 self.redis.delete(tx_key)
+@@ -845,11 +647,11 @@ class CentralSystemCP201(CP201):
+                             break
+                     else:
+                         txs.append(entry)
+-                    save_json(TRANSACTIONS_FILE, txs)
++                    TRANSACTIONS_FILE.write_text(json.dumps(txs, indent=2, ensure_ascii=False), encoding="utf-8")
+                 except Exception as e:
+                     logger.error("Failed to update 2.0.1 transaction: %s", e)
+ 
+-        return call_result201.TransactionEvent(id_token_info=id_token_info)
++        return call_result201.TransactionEvent()
+ 
+ 
+ async def on_connect(websocket, path):
+@@ -882,7 +684,7 @@ async def on_connect(websocket, path):
+         cps = load_json(CPS_FILE, {})
+         if cp_id not in cps:
+             cps[cp_id] = {"org_id": "default", "alias": cp_id}
+-            save_json(CPS_FILE, cps)
++            CPS_FILE.write_text(json.dumps(cps, indent=2, ensure_ascii=False), encoding="utf-8")
+             logger.info("CP '%s' automapped to org 'default'", cp_id)
+     else:
+         logger.info("CP '%s' connected without automap (CP_AUTOMAP_ON_CONNECT=false)", cp_id)
+diff --git a/evcsms/tools/send_ocpp_command.py b/evcsms/tools/send_ocpp_command.py
+deleted file mode 100644
+index 51df4b2..0000000
+--- a/evcsms/tools/send_ocpp_command.py
++++ /dev/null
+@@ -1,71 +0,0 @@
+-import json
+-import uuid
+-import sys
+-import os
+-from datetime import datetime, timezone
+-from pathlib import Path
+-
+-# Add the parent directory to sys.path so we can import app
+-sys.path.append(str(Path(__file__).parent.parent))
+-
+-from app.redis_config import build_redis_client
+-
+-def iso_now():
+-    return datetime.now(timezone.utc).isoformat()
+-
+-def main():
+-    if len(sys.argv) < 3:
+-        print("Usage: python send_ocpp_command.py <cp_id> <command> [payload_json]")
+-        print("Example: python send_ocpp_command.py 55Z00A10H set_variables '{\"variables\": [{\"component\": \"TxCtrlr\", \"variable\": \"TxStartPoint\", \"value\": \"Authorized\"}]}'")
+-        sys.exit(1)
+-
+-    cp_id = sys.argv[1]
+-    command = sys.argv[2]
+-    payload = {}
+-    
+-    if len(sys.argv) > 3:
+-        try:
+-            payload = json.loads(sys.argv[3])
+-        except Exception as e:
+-            print(f"Error parsing payload JSON: {e}")
+-            sys.exit(1)
+-
+-    try:
+-        redis_client = build_redis_client()
+-        command_id = str(uuid.uuid4())
+-        
+-        envelope = {
+-            "command_id": command_id,
+-            "cp_id": cp_id,
+-            "command": command,
+-            "payload": payload,
+-            "requested_by": "terminal_tool",
+-            "requested_at": iso_now(),
+-        }
+-        
+-        # Set initial result status
+-        result_key = f"ocpp:command_result:{command_id}"
+-        redis_client.setex(
+-            result_key,
+-            600,
+-            json.dumps({
+-                "command_id": command_id,
+-                "status": "queued",
+-                "cp_id": cp_id,
+-                "command": command,
+-                "requested_at": envelope["requested_at"],
+-            }),
+-        )
+-        
+-        # Push to command queue
+-        redis_client.rpush("ocpp:commands", json.dumps(envelope))
+-        print(f"✅ Command '{command}' successfully queued for charger '{cp_id}'.")
+-        print(f"   Command ID: {command_id}")
+-        print(f"   Status: Queued")
+-        
+-    except Exception as e:
+-        print(f"❌ Error sending command: {e}")
+-        sys.exit(1)
+-
+-if __name__ == "__main__":
+-    main()
+diff --git a/evcsms/web/assets/installer_live_ops.js b/evcsms/web/assets/installer_live_ops.js
+index 1912056..9caf7f3 100644
+--- a/evcsms/web/assets/installer_live_ops.js
++++ b/evcsms/web/assets/installer_live_ops.js
+@@ -10,7 +10,6 @@
+   };
+ 
+   const $ = (s) => document.querySelector(s);
+-  const $$ = (s) => document.querySelectorAll(s);
+ 
+   const state = {
+     orgs: {},
+diff --git a/evcsms/web/assets/portal_index.js b/evcsms/web/assets/portal_index.js
+index e36e295..62a62d6 100644
+--- a/evcsms/web/assets/portal_index.js
++++ b/evcsms/web/assets/portal_index.js
+@@ -118,7 +118,7 @@
+           <div class="card-body">
+             <h5 class="card-title d-flex align-items-center gap-2">
+               <i class="bi bi-ev-front"></i> ${meta.alias || displayCpId(cpId)}
+-              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge text-bg-secondary ms-auto">${state.orgs[meta.org_id]?.name || meta.org_id}</span>` : ''}
++              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge text-bg-secondary ms-auto">${meta.org_id}</span>` : ''}
+             </h5>
+             <div class="small text-muted mb-2">ID: ${cpId}</div>
+             <div class="mb-2">
+diff --git a/evcsms/web/assets/portal_live_ops.js b/evcsms/web/assets/portal_live_ops.js
+index f6a7f73..3806998 100644
+--- a/evcsms/web/assets/portal_live_ops.js
++++ b/evcsms/web/assets/portal_live_ops.js
+@@ -10,7 +10,6 @@
+   };
+ 
+   const $ = (s) => document.querySelector(s);
+-  const $$ = (s) => document.querySelectorAll(s);
+ 
+   const state = {
+     orgs: {},
+@@ -52,12 +51,6 @@
+     get_configuration: {
+       showConfigKeys: true,
+     },
+-    set_variables: {
+-      showSetVariables: true,
+-    },
+-    set_display_message: {
+-      showDisplayMessage: true,
+-    },
+   };
+ 
+   const GET_CONFIGURATION_OPTIONS = [
+@@ -227,8 +220,6 @@
+     toggleField('#connectorWrap', !!cfg.showConnector);
+     toggleField('#idTagWrap', !!cfg.showIdTag);
+     toggleField('#configKeyWrap', !!cfg.showConfigKeys);
+-    toggleField('#displayMessageWrap', !!cfg.showDisplayMessage);
+-    toggleField('#setVariablesWrap', !!cfg.showSetVariables);
+ 
+     const cfgSelect = $('#configKeySelect');
+     if (cfgSelect && cfg.showConfigKeys) {
+@@ -315,22 +306,6 @@
+       payload.connector_id = connectorId;
+     } else if (command === 'get_configuration') {
+       if (configKeyValue && configKeyValue !== '__all__') payload.key = configKeyValue;
+-    } else if (command === 'set_variables') {
+-      const comp = ($('#setVarComponent')?.value || '').trim();
+-      const variable = ($('#setVarVariable')?.value || '').trim();
+-      const val = ($('#setVarValue')?.value || '').trim();
+-      if (!comp || !variable || !val) {
+-        UI.alert('Fyll i komponent, variabel och värde.');
+-        return;
+-      }
+-      payload.variables = [{ component: comp, variable: variable, value: val }];
+-    } else if (command === 'set_display_message') {
+-      const url = ($('#displayMessageUrl')?.value || '').trim();
+-      if (!url) {
+-        UI.alert('Ange en bild-URL.');
+-        return;
+-      }
+-      payload.url = url;
+     }
+ 
+     if (!confirmDangerousCommand(command, cpId, payload)){
+diff --git a/evcsms/web/assets/users_history.js b/evcsms/web/assets/users_history.js
+index 3785041..121895d 100644
+--- a/evcsms/web/assets/users_history.js
++++ b/evcsms/web/assets/users_history.js
+@@ -87,14 +87,15 @@
+     LAST_PERIOD_DAYS = String(hist?.period_days ?? '');
+     LAST_RENDER_ROWS = filtered.map(r=>{
+       const nm=r.name || (umap?.[r.tag]?.name || [umap?.[r.tag]?.first_name, umap?.[r.tag]?.last_name].filter(Boolean).join(' ') || r.tag);
++      const cp=r.charge_point?String(r.charge_point).split('/').pop():'';
+       return {
+         stop_time: r.stop_time||'',
+         name: nm,
+         tag: r.tag||'',
+-        cp: r.charge_point_alias || (r.charge_point ? String(r.charge_point).split('/').pop() : ''),
++        cp,
+         connectorId: r.connectorId,
+         energy_kwh: r.energy_kwh??0,
+-        org: r.org_name || r.org_id || tagOrg[r.tag] || ''
++        org: tagOrg[r.tag]||''
+       };
+     });
+     drawHistoryRows(LAST_RENDER_ROWS, role);
+diff --git a/evcsms/web/instructions.html b/evcsms/web/instructions.html
+index 10f2921..fdb9a94 100644
+--- a/evcsms/web/instructions.html
++++ b/evcsms/web/instructions.html
+@@ -100,21 +100,6 @@
+           </div>
+         </div>
+         
+-        <div class="card border-0 shadow-sm mb-4">
+-          <div class="card-body">
+-            <h5 class="card-title"><i class="bi bi-shield-lock"></i> OCPP 2.0.1 Konfiguration (Autentisering)</h5>
+-            <p>För OCPP 2.0.1-laddare används ett nytt system med <strong>Komponenter</strong> och <strong>Variabler</strong>. För att kräva RFID-autentisering:</p>
+-            
+-            <ol>
+-              <li>Gå till <strong>Live driftpanel</strong>.</li>
+-              <li>Välj laddaren och kommandot <strong>Konfigurera (OCPP 2.0.1)</strong>.</li>
+-              <li>Sätt <strong>Komponent</strong> till <code>AuthCtrlr</code>, <strong>Variabel</strong> till <code>Enabled</code> och <strong>Värde</strong> till <code>true</code>.</li>
+-              <li>Klicka på <strong>Skicka kommando</strong>.</li>
+-            </ol>
+-            <p class="small text-muted">Detta tvingar laddaren att fråga servern om lov innan laddning påbörjas.</p>
+-          </div>
+-        </div>
+-
+         <div class="card border-0 shadow-sm">
+           <div class="card-body">
+             <h5 class="card-title"><i class="bi bi-broadcast-pin"></i> Live-hantering</h5>
+@@ -130,7 +115,7 @@
+             <p class="mb-1"><strong>WS Endpoint:</strong></p>
+             <p class="mb-3"><code>takoramcharge.se</code></p>
+             <p class="mb-1"><strong>Protokoll:</strong></p>
+-            <p class="mb-3">OCPP 1.6J & OCPP 2.0.1</p>
++            <p class="mb-3">OCPP 1.6J</p>
+             <hr>
+             <p class="small mb-0">Vid problem med anslutning, kontrollera att laddaren har internetåtkomst och att DNS kan slå upp takoramcharge.se.</p>
+           </div>
+diff --git a/evcsms/web/portal/live_ops.html b/evcsms/web/portal/live_ops.html
+index 6dfcbd2..cc26d93 100644
+--- a/evcsms/web/portal/live_ops.html
++++ b/evcsms/web/portal/live_ops.html
+@@ -119,8 +119,6 @@
+                       <option value="remote_start_transaction">Fjärrstart</option>
+                       <option value="remote_stop_transaction">Fjärrstop</option>
+                       <option value="get_configuration">Hämta konfiguration</option>
+-                      <option value="set_variables">Konfigurera (OCPP 2.0.1)</option>
+-                      <option value="set_display_message">Visa logotyp (OCPP 2.0.1)</option>
+                     </select>
+                   </div>
+                   <div class="col-12 col-md-6" id="commandArgWrap">
+@@ -148,26 +146,6 @@
+                       <option value="ConnectionTimeOut">ConnectionTimeOut</option>
+                     </select>
+                   </div>
+-                  <div class="col-12 col-md-6 d-none" id="displayMessageWrap">
+-                    <label for="displayMessageUrl" class="form-label">Bild-URL (PNG/JPG)</label>
+-                    <input id="displayMessageUrl" type="text" class="form-control" placeholder="https://...">
+-                  </div>
+-                  <div class="col-12 d-none" id="setVariablesWrap">
+-                    <div class="row g-2">
+-                      <div class="col-12 col-md-4">
+-                        <label for="setVarComponent" class="form-label">Komponent</label>
+-                        <input id="setVarComponent" type="text" class="form-control" placeholder="Ex: TxCtrlr">
+-                      </div>
+-                      <div class="col-12 col-md-4">
+-                        <label for="setVarVariable" class="form-label">Variabel</label>
+-                        <input id="setVarVariable" type="text" class="form-control" placeholder="Ex: TxStartPoint">
+-                      </div>
+-                      <div class="col-12 col-md-4">
+-                        <label for="setVarValue" class="form-label">Värde</label>
+-                        <input id="setVarValue" type="text" class="form-control" placeholder="Ex: Authorized">
+-                      </div>
+-                    </div>
+-                  </div>
+                 </div>
+               </div>
+             </div>
+@@ -202,7 +180,7 @@
+ 
+   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+   <script src="/assets/ui-common.js"></script>
+-  <script src="/assets/portal_live_ops.js?v=7"></script>
++  <script src="/assets/portal_live_ops.js?v=6"></script>
+ </body>
+ </html>

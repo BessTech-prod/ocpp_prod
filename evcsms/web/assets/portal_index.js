@@ -43,6 +43,7 @@
   // ------- Org-filter (endast portal_admin/admin) -------
   let ROLE = null;
   let CPS_ASSIGN = {}; // {cp_id -> {org_id, alias}}
+  let ORGS_MAP = {};   // {org_id -> {name, ...}}
       function cpMeta(cpId){
         const row = CPS_ASSIGN?.[cpId];
         if (row && typeof row === 'object') {
@@ -69,6 +70,7 @@
     const wrap=$('#orgFilterWrap'); if(wrap) wrap.style.display='';
     try{
       const [orgs, map] = await Promise.all([UI.getJSON(API.orgs), UI.getJSON(API.cpsMap)]);
+      ORGS_MAP = orgs || {};
       CPS_ASSIGN = map || {};
       const sel = $('#orgFilter');
       sel.innerHTML = `<option value="">Alla organisationer</option>` +
@@ -118,7 +120,7 @@
           <div class="card-body">
             <h5 class="card-title d-flex align-items-center gap-2">
               <i class="bi bi-ev-front"></i> ${meta.alias || displayCpId(cpId)}
-              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge text-bg-secondary ms-auto">${state.orgs[meta.org_id]?.name || meta.org_id}</span>` : ''}
+              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge text-bg-secondary ms-auto">${ORGS_MAP[meta.org_id]?.name || meta.org_id}</span>` : ''}
             </h5>
             <div class="small text-muted mb-2">ID: ${cpId}</div>
             <div class="mb-2">

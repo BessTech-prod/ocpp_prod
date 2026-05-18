@@ -455,6 +455,11 @@ class CentralSystemCP(CP):
         id_tag = normalize_tag(id_tag)
         if id_tag:
             self._last_id_tag = id_tag
+            # Persist in Redis to survive reconnections
+            try:
+                self.redis.setex(f"last_tag:{self.id}", 3600, id_tag)
+            except Exception as e:
+                logger.warning("[%s] Failed to persist last_tag in Redis: %s", self.id, e)
 
     @on(Action.boot_notification)
     async def on_boot_notification(self, charge_point_vendor, charge_point_model, **kwargs):
@@ -567,7 +572,15 @@ class CentralSystemCP(CP):
         # Also append to persistent storage
         try:
             txs = load_json(TRANSACTIONS_FILE, [])
-            txs.append(entry)
+            if not isinstance(txs, list): txs = []
+            # Use compound check for safety
+            for existing in txs:
+                if not isinstance(existing, dict): continue
+                if str(existing.get("transaction_id")) == str(tx_id) and existing.get("charge_point") == self.id:
+                    existing.update(entry)
+                    break
+            else:
+                txs.append(entry)
             save_json(TRANSACTIONS_FILE, txs)
         except Exception as e:
             logger.error("Failed to save transaction: %s", e)
@@ -597,7 +610,7 @@ class CentralSystemCP(CP):
             try:
                 txs = load_json(TRANSACTIONS_FILE, [])
                 for tx in txs:
-                    if tx.get("transaction_id") == tx_id:
+                    if str(tx.get("transaction_id")) == str(tx_id) and tx.get("charge_point") == self.id:
                         tx.update(entry)
                         break
                 else:
@@ -620,13 +633,27 @@ class CentralSystemCP201(CP201):
 
     def track_tag(self, id_tag, evse_id=None):
         id_tag = normalize_tag(id_tag)
-        if id_tag:
+        if id_tag and id_tag != "UNKNOWN":
             self._last_id_tag = id_tag
-            if evse_id is not None:
-                self._evse_tags[int(evse_id)] = id_tag
+            try:
+                # Persist in Redis to survive reconnections
+                self.redis.setex(f"last_tag:{self.id}", 3600, id_tag)
+                if evse_id is not None:
+                    evse_id = int(evse_id)
+                    self._evse_tags[evse_id] = id_tag
+                    self.redis.setex(f"last_tag:{self.id}:{evse_id}", 3600, id_tag)
+            except Exception as e:
+                logger.warning("[%s] Failed to persist last_tag in Redis: %s", self.id, e)
 
     def track_remote_start(self, remote_start_id, id_tag):
-        self._remote_start_tags[int(remote_start_id)] = normalize_tag(id_tag)
+        id_tag = normalize_tag(id_tag)
+        rid = int(remote_start_id)
+        self._remote_start_tags[rid] = id_tag
+        try:
+            # Persist in Redis
+            self.redis.setex(f"remote_tag:{self.id}:{rid}", 3600, id_tag)
+        except Exception as e:
+            logger.warning("[%s] Failed to persist remote_tag in Redis: %s", self.id, e)
 
     @on(Action201.boot_notification)
     async def on_boot_notification(self, charging_station, reason, **kwargs):
@@ -750,21 +777,46 @@ class CentralSystemCP201(CP201):
             token_dict = make_json_safe(id_token) if id_token else {}
 
             remote_start_id = kwargs.get("remote_start_id")
-            remote_tag = self._remote_start_tags.get(int(remote_start_id)) if remote_start_id is not None else None
-
+            remote_tag = None
+            if remote_start_id is not None:
+                rid = int(remote_start_id)
+                remote_tag = self._remote_start_tags.get(rid)
+                if not remote_tag:
+                    try:
+                        val = self.redis.get(f"remote_tag:{self.id}:{rid}")
+                        if val: remote_tag = val.decode() if isinstance(val, bytes) else val
+                    except: pass
+            
             # Priority: 1. idToken in message, 2. remoteStartId association, 3. EVSE-specific tag, 4. last global tag
-            id_tag = normalize_tag(
-                token_dict.get("id_token") or 
-                token_dict.get("idToken") or 
+            fallback_evse = self._evse_tags.get(evse_id)
+            if not fallback_evse:
+                try:
+                    val = self.redis.get(f"last_tag:{self.id}:{evse_id}")
+                    if val: fallback_evse = val.decode() if isinstance(val, bytes) else val
+                except: pass
+            
+            fallback_global = self._last_id_tag
+            if not fallback_global:
+                try:
+                    val = self.redis.get(f"last_tag:{self.id}")
+                    if val: fallback_global = val.decode() if isinstance(val, bytes) else val
+                except: pass
+
+            token_tag = normalize_tag(token_dict.get("id_token") or token_dict.get("idToken"))
+            id_tag = (
+                token_tag if token_tag and token_tag != "UNKNOWN" else
                 remote_tag or
-                self._evse_tags.get(evse_id) or 
-                self._last_id_tag or 
-                "unknown"
+                fallback_evse or 
+                fallback_global or 
+                "UNKNOWN"
             )
             
+            logger.info("[%s] v2.0.1 tag resolution: idToken=%s remote=%s evse=%s global=%s -> final=%s", 
+                        self.id, token_dict.get("id_token") or token_dict.get("idToken"), remote_tag, fallback_evse, fallback_global, id_tag)
+
             # Track it for future events in this transaction if needed
             self.track_tag(id_tag, evse_id)
-
+            
             # Perform authorization check
             ok = is_tag_allowed_on_cp(id_tag, self.id)
             status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
@@ -810,16 +862,25 @@ class CentralSystemCP201(CP201):
             except Exception as e:
                 logger.error("Enrichment failed during 2.0.1 start: %s", e)
 
-            self.redis.set(f"open_tx:{tx_id}", json.dumps(entry))
+            # Use compound key to avoid collisions between chargers
+            self.redis.set(f"open_tx:{self.id}:{tx_id}", json.dumps(entry))
             try:
                 txs = load_json(TRANSACTIONS_FILE, [])
-                txs.append(entry)
+                if not isinstance(txs, list): txs = []
+                # Check if already exists to avoid duplicates on re-sent 'Started' events
+                for existing in txs:
+                    if not isinstance(existing, dict): continue
+                    if str(existing.get("transaction_id")) == str(tx_id) and existing.get("charge_point") == self.id:
+                        existing.update(entry)
+                        break
+                else:
+                    txs.append(entry)
                 save_json(TRANSACTIONS_FILE, txs)
             except Exception as e:
                 logger.error("Failed to save 2.0.1 transaction: %s", e)
 
         elif event_type == "Ended":
-            tx_key = f"open_tx:{tx_id}"
+            tx_key = f"open_tx:{self.id}:{tx_id}"
             tx_data = self.redis.get(tx_key)
             if tx_data:
                 entry = json.loads(tx_data)
@@ -839,8 +900,10 @@ class CentralSystemCP201(CP201):
                 self.redis.delete(tx_key)
                 try:
                     txs = load_json(TRANSACTIONS_FILE, [])
+                    if not isinstance(txs, list): txs = []
                     for tx in txs:
-                        if str(tx.get("transaction_id")) == str(tx_id):
+                        if not isinstance(tx, dict): continue
+                        if str(tx.get("transaction_id")) == str(tx_id) and tx.get("charge_point") == self.id:
                             tx.update(entry)
                             break
                     else:
@@ -904,6 +967,14 @@ async def on_connect(websocket, path):
         logger.info("CP disconnected: %s", cp_id)
 
 
+async def process_request(path, request_headers):
+    """Log incoming WebSocket handshake for debugging."""
+    # We only log at INFO if it's a suspicious request, otherwise DEBUG
+    ua = request_headers.get("User-Agent", "Unknown")
+    subproto = request_headers.get("Sec-WebSocket-Protocol", "None")
+    logger.debug("Handshake attempt: path=%s subproto=%s UA=%s", path, subproto, ua)
+    return None
+
 async def main():
     await wait_for_redis()
     ensure_default_org()
@@ -916,6 +987,7 @@ async def main():
         host="0.0.0.0",
         port=OCPP_PORT,
         subprotocols=["ocpp1.6", "ocpp2.0.1"],
+        process_request=process_request,
         ping_interval=20,
         ping_timeout=20,
     )
