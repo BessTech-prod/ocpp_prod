@@ -458,7 +458,38 @@ class CentralSystemCP(CP):
 
     @on(Action.boot_notification)
     async def on_boot_notification(self, charge_point_vendor, charge_point_model, **kwargs):
-        logger.info("[%s] BootNotification", self.id)
+        logger.info("[%s] BootNotification vendor=%s model=%s", self.id, charge_point_vendor, charge_point_model)
+        
+        # Store metadata in Redis and update cps.json if needed
+        metadata = {
+            "vendor": charge_point_vendor,
+            "model": charge_point_model,
+            "serial": kwargs.get("charge_point_serial_number") or kwargs.get("chargePointSerialNumber") or "Unknown",
+            "firmware": kwargs.get("firmware_version") or kwargs.get("firmwareVersion") or "Unknown",
+            "ocpp_version": "1.6",
+            "last_boot": iso_now(),
+        }
+        self.redis.set(f"cp_metadata:{self.id}", json.dumps(metadata))
+        
+        try:
+            cps = load_json(CPS_FILE, {})
+            existing = cps.get(self.id, {})
+            if isinstance(existing, str):
+                existing = {"org_id": existing}
+            
+            # Update metadata in cps.json
+            updated = False
+            for k, v in metadata.items():
+                if existing.get(k) != v:
+                    existing[k] = v
+                    updated = True
+            
+            if updated:
+                cps[self.id] = existing
+                save_json(CPS_FILE, cps)
+        except Exception as e:
+            logger.error("[%s] Failed to update cps.json with metadata: %s", self.id, e)
+
         return call_result.BootNotification(
             current_time=iso_now(),
             interval=30,
@@ -601,7 +632,42 @@ class CentralSystemCP201(CP201):
     async def on_boot_notification(self, charging_station, reason, **kwargs):
         cs_dict = make_json_safe(charging_station)
         vendor = cs_dict.get("vendor_name") or cs_dict.get("vendorName") or "Unknown"
-        logger.info("[%s] BootNotification (v2.0.1) from %s", self.id, vendor)
+        model = cs_dict.get("model") or "Unknown"
+        serial = cs_dict.get("serial_number") or cs_dict.get("serialNumber") or "Unknown"
+        fw = cs_dict.get("firmware_version") or cs_dict.get("firmwareVersion") or "Unknown"
+        
+        logger.info("[%s] BootNotification (v2.0.1) from %s (%s) sn:%s fw:%s", self.id, vendor, model, serial, fw)
+        
+        # Store metadata in Redis and update cps.json if needed
+        metadata = {
+            "vendor": vendor,
+            "model": model,
+            "serial": serial,
+            "firmware": fw,
+            "ocpp_version": "2.0.1",
+            "last_boot": iso_now(),
+        }
+        self.redis.set(f"cp_metadata:{self.id}", json.dumps(metadata))
+        
+        try:
+            cps = load_json(CPS_FILE, {})
+            existing = cps.get(self.id, {})
+            if isinstance(existing, str):
+                existing = {"org_id": existing}
+            
+            # Update metadata in cps.json
+            updated = False
+            for k, v in metadata.items():
+                if existing.get(k) != v:
+                    existing[k] = v
+                    updated = True
+            
+            if updated:
+                cps[self.id] = existing
+                save_json(CPS_FILE, cps)
+        except Exception as e:
+            logger.error("[%s] Failed to update cps.json with metadata: %s", self.id, e)
+
         return call_result201.BootNotification(
             current_time=iso_now(),
             interval=30,

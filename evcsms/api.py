@@ -428,8 +428,8 @@ async def require_installer_or_api_key(request: Request, api_key: Optional[str] 
     raise HTTPException(401, "Not authenticated (valid session or api_key required)")
 
 def require_org_admin_or_portal(s=Depends(get_session)):
-    if (s.get("role") or "").lower() not in ("org_admin", "portal_admin", "admin", "installer"):
-        raise HTTPException(403, "Admin/org_admin or installer required")
+    if (s.get("role") or "").lower() not in ("org_admin", "portal_admin", "admin"):
+        raise HTTPException(403, "Admin/org_admin required")
     return s
 
 # =====================================================================
@@ -1134,9 +1134,7 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
     # Org check
     org_id = session.get("org_id")
     if org_id:
-        cps_map = normalize_cps_map(load_cps_map())
-        cp_data = cps_map.get(cp_id)
-        if not cp_data or (cp_data.get("org_id") or "default") != org_id:
+        if org_for_cp(cp_id) != org_id:
             raise HTTPException(403, "Du har inte behörighet att styra denna laddare")
 
     allowed_commands = {
@@ -2611,14 +2609,26 @@ def _history_rows_for_session(days: int, tag: Optional[str], session: dict) -> L
         except (TypeError, ValueError):
             e = 0.0
 
+        # Resolve org and alias for display
+        tx_org_id = tx.get("org_id") or "default"
+        orgs_map = load_orgs()
+        tx_org_name = tx.get("org_name") or orgs_map.get(tx_org_id, {}).get("name") or tx_org_id
+        
+        cps_map = normalize_cps_map(load_cps_map())
+        cp_meta = cps_map.get(tx.get("charge_point"), {})
+        cp_alias = cp_meta.get("alias") or tx.get("charge_point") or "Unknown"
+
         rows.append({
             "tag": tg,
             "name": display_name_for_tag(tg, users_map),
             "charge_point": tx.get("charge_point") or "Unknown",
+            "charge_point_alias": cp_alias,
             "connectorId": tx.get("connectorId") or 1,
             "start_time": tx.get("start_time"),
             "stop_time": tx.get("stop_time"),
             "energy_kwh": round(max(0.0, e), 3),
+            "org_id": tx_org_id,
+            "org_name": tx_org_name,
         })
 
     rows.sort(key=lambda r: str(r.get("stop_time") or ""), reverse=True)

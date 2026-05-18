@@ -87,15 +87,14 @@
     LAST_PERIOD_DAYS = String(hist?.period_days ?? '');
     LAST_RENDER_ROWS = filtered.map(r=>{
       const nm=r.name || (umap?.[r.tag]?.name || [umap?.[r.tag]?.first_name, umap?.[r.tag]?.last_name].filter(Boolean).join(' ') || r.tag);
-      const cp=r.charge_point?String(r.charge_point).split('/').pop():'';
       return {
         stop_time: r.stop_time||'',
         name: nm,
         tag: r.tag||'',
-        cp,
+        cp: r.charge_point_alias || (r.charge_point ? String(r.charge_point).split('/').pop() : ''),
         connectorId: r.connectorId,
         energy_kwh: r.energy_kwh??0,
-        org: tagOrg[r.tag]||''
+        org: r.org_name || r.org_id || tagOrg[r.tag] || ''
       };
     });
     drawHistoryRows(LAST_RENDER_ROWS, role);

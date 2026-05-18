@@ -118,7 +118,7 @@
           <div class="card-body">
             <h5 class="card-title d-flex align-items-center gap-2">
               <i class="bi bi-ev-front"></i> ${meta.alias || displayCpId(cpId)}
-              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge text-bg-secondary ms-auto">${meta.org_id}</span>` : ''}
+              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge text-bg-secondary ms-auto">${state.orgs[meta.org_id]?.name || meta.org_id}</span>` : ''}
             </h5>
             <div class="small text-muted mb-2">ID: ${cpId}</div>
             <div class="mb-2">
