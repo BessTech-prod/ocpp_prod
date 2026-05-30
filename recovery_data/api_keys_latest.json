@@ -1,0 +1,25 @@
+{
+  "29064e7ac2cd5690d681f06542a986aea91af783e5f3d925d6a9d1ae9f659db1": {
+    "org_id": "kaefer_std",
+    "created_at": "2026-05-07T18:42:32.815725+00:00",
+    "last_used": null,
+    "rate_limit": 1000,
+    "active": true
+  },
+  "8aa3f491053d56e7a662b97970c2e9e49b516786b5a8794e2e4f4780cc9dfd4f": {
+    "org_id": "Takorama_Storås",
+    "created_at": "2026-05-08T12:41:55.275741+00:00",
+    "last_used": null,
+    "rate_limit": 120,
+    "ip_whitelist": [],
+    "active": true
+  },
+  "f4d0d52b40f7959b6986c1b39a8a3539c60b9ef1052b9c529d9ea688896d6c0b": {
+    "org_id": "Takorama_Storås",
+    "created_at": "2026-05-08T08:26:56.725362+00:00",
+    "last_used": null,
+    "rate_limit": 1000,
+    "ip_whitelist": [],
+    "active": true
+  }
+}
