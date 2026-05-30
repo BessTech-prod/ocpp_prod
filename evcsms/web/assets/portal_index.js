@@ -54,6 +54,7 @@
 
   let LAST_CPS = [];   // snapshot från API
   let LAST_STATUS = {};
+  let LAST_METADATA = {};
 
   async function initOrgFilterIfPortal(){
     const me = await UI.getJSON(API.me);
@@ -76,6 +77,8 @@
       sel.innerHTML = `<option value="">Alla organisationer</option>` +
         Object.entries(orgs||{}).map(([id,o])=>`<option value="${id}">${(o?.name||id)} (${id})</option>`).join('');
       sel.addEventListener('change', renderSnapshot);
+      const search = $('#cpSearch');
+      if (search) search.addEventListener('input', renderSnapshot);
     }catch(e){
       console.warn('Kunde inte ladda orgs/cpsMap:', e);
     }
@@ -96,8 +99,18 @@
     // Klientfilter för portal
     let visible = cps.slice();
     const selectedOrg = ($('#orgFilter')?.value || '');
+    const searchVal = ($('#cpSearch')?.value || '').toLowerCase().trim();
+
     if((ROLE==='portal_admin'||ROLE==='admin') && selectedOrg){
       visible = visible.filter(cp => (cpMeta(cp).org_id || '') === selectedOrg);
+    }
+    
+    if (searchVal) {
+      visible = visible.filter(cp => {
+        const alias = (cpMeta(cp).alias || '').toLowerCase();
+        const id = String(cp).toLowerCase();
+        return alias.includes(searchVal) || id.includes(searchVal);
+      });
     }
 
     renderStatusCards(visible, statusData);
@@ -110,6 +123,7 @@
     visible.forEach(cpId=>{
       const cpStat = statusData[cpId] || {};
       const meta = cpMeta(cpId);
+      const mdata = LAST_METADATA[cpId] || {};
       const c1 = cpStat[1];
       const c2 = cpStat[2];
 
@@ -117,19 +131,36 @@
       col.className = 'col-12 col-md-6 col-lg-4';
       col.innerHTML = `
         <div class="card border-0 shadow-sm h-100">
-          <div class="card-body">
-            <h5 class="card-title d-flex align-items-center gap-2">
-              <i class="bi bi-ev-front"></i> ${meta.alias || displayCpId(cpId)}
-              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge text-bg-secondary ms-auto">${ORGS_MAP[meta.org_id]?.name || meta.org_id}</span>` : ''}
+          <div class="card-body d-flex flex-column">
+            <h5 class="card-title d-flex align-items-center gap-2 mb-1">
+              <i class="bi bi-ev-front"></i> ${UI.esc(meta.alias || displayCpId(cpId))}
+              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge text-bg-secondary ms-auto">${UI.esc(ORGS_MAP[meta.org_id]?.name || meta.org_id)}</span>` : ''}
             </h5>
-            <div class="small text-muted mb-2">ID: ${cpId}</div>
-            <div class="mb-2">
-              <strong>Uttag 1:</strong>
-              <span class="${UI.statusClass(c1?.status)}">${UI.statusLabelSv(c1?.status)}</span>
+            <div class="small text-muted mb-3">ID: ${UI.esc(cpId)}</div>
+            
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <div class="small fw-bold">Uttag 1</div>
+                <span class="${UI.statusClass(c1?.status)}">${UI.statusLabelSv(c1?.status)}</span>
+              </div>
+              <div class="col-6">
+                <div class="small fw-bold">Uttag 2</div>
+                <span class="${UI.statusClass(c2?.status)}">${UI.statusLabelSv(c2?.status)}</span>
+              </div>
             </div>
-            <div>
-              <strong>Uttag 2:</strong>
-              <span class="${UI.statusClass(c2?.status)}">${UI.statusLabelSv(c2?.status)}</span>
+
+            ${mdata.vendor ? `
+            <div class="mt-auto pt-2 border-top">
+              <div class="row g-0 small text-muted">
+                <div class="col-6">Modell: <strong>${UI.esc(mdata.model || '?')}</strong></div>
+                <div class="col-6 text-end">${UI.esc(mdata.vendor)}</div>
+              </div>
+            </div>` : ''}
+            
+            <div class="mt-3">
+              <a href="/portal/live_ops.html?cp=${encodeURIComponent(cpId)}" class="btn btn-sm btn-outline-primary w-100">
+                <i class="bi bi-broadcast-pin"></i> Driftpanel
+              </a>
             </div>
           </div>
         </div>`;
@@ -150,6 +181,7 @@
         UI.getJSON(API.status)
       ]);
       LAST_CPS = cpsRes?.connected || [];
+      LAST_METADATA = cpsRes?.metadata || {};
       LAST_STATUS = statusRes || {};
       renderSnapshot();
       setLastRefresh();

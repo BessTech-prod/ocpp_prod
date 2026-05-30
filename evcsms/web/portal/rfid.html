@@ -196,6 +196,31 @@
         </table>
       </div>
     </section>
+    <!-- NEKADE RFID-FÖRSÖK (Portal Admin Only) -->
+    <section class="content-panel mb-4" data-visible-roles="portal_admin,admin" id="blocked-rfids-section">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+          <h2 class="h5 m-0 text-danger"><i class="bi bi-shield-slash"></i> Nekade RFID-försök</h2>
+          <p class="page-subtitle mb-0">Här ser du taggar som försökt ladda men som inte finns i systemet eller är inaktiva.</p>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" id="btnClearBlockedRfids">Rensa lista</button>
+      </div>
+      <div class="table-responsive shadow-sm table-panel">
+        <table class="table table-sm table-striped align-middle" id="blocked-rfid-table">
+          <thead class="table-dark">
+            <tr>
+              <th>Tidpunkt</th>
+              <th>RFID-kod</th>
+              <th>Laddare (CP)</th>
+              <th class="text-end">Åtgärd</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" class="text-center text-muted py-4">Inga nekade försök loggade.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
   </main>
 

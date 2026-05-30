@@ -19,7 +19,7 @@ SSH into your VM and navigate to the project directory. Run the following to get
 cd ocpp_projekt2.0/evcsms
 git pull origin main
 ```
-*Note: This command will only update the system files. It will **not** affect your local `.env`, `api_keys.json`, or `transactions.json` files.*
+*Note: This command will only update the system files. It will **not** affect your local `.env`, `api_keys.json`, `rfids.json`, `users.json`, or `transactions.json` files if you have not modified them in the repository.*
 
 ---
 

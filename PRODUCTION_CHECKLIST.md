@@ -3,7 +3,8 @@
 Use this checklist to ensure a stable and secure deployment to the production environment.
 
 ### ⚠️ Safety & Persistence
-- [ ] **Data Preservation**: Confirmed that `git pull` will not overwrite local `.env`, `api_keys.json`, or `transactions.json`.
+- [ ] **Data Preservation**: Confirmed that `git pull` will not overwrite local `.env`, `api_keys.json`, `rfids.json`, `users.json`, or `transactions.json`.
+- [ ] **Blocked RFID Feature**: Verified that `blocked_rfids.json` is ignored by Git and only exists locally in `/data`.
 - [ ] **HTTPS Compatibility**: Host-level Nginx config is pointing to port 8080 (standard for this project's UI-service).
 - [ ] **Secrets**: Existing `APP_SECRET` and `REDIS_PASSWORD` are preserved and verified working.
 

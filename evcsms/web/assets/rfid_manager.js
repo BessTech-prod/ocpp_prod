@@ -5,6 +5,8 @@
     users: '/api/users/map',
     rfids: '/api/rfids',
     audit: '/api/rfids/audit',
+    blockedRfids: '/api/blocked_rfids',
+    clearBlockedRfids: '/api/blocked_rfids/clear',
     importTemplate: '/api/rfids/import/template.xlsx',
     importXlsx:     '/api/rfids/import/xlsx',
   };
@@ -21,6 +23,7 @@
     auditItems: [],
     auditExpanded: false,
     editingTag: null,
+    blockedItems: [],
   };
 
   const $ = (s) => document.querySelector(s);
@@ -300,6 +303,7 @@
       }
       resetForm();
       await refresh();
+      await refreshBlocked();
     } catch (e2) {
       UI.alert(`Kunde inte spara RFID: ${e2.message || e2}`);
     }
@@ -341,6 +345,73 @@
         <td><code>${esc(r.tag || '')}</code></td>
         <td><small>${esc(JSON.stringify(r.details || {}))}</small></td>
       </tr>`).join('');
+  }
+
+  function renderBlockedTable(){
+    const tbody = $('#blocked-rfid-table tbody');
+    if (!tbody) return;
+
+    const rows = state.blockedItems || [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Inga nekade försök loggade.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((r) => `
+      <tr>
+        <td>${esc(r.timestamp || '')}</td>
+        <td><code>${esc(r.tag || '')}</code></td>
+        <td>${esc(r.cp_id || '')}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-primary" data-authorize-blocked="${esc(r.tag)}" type="button">
+            <i class="bi bi-plus-circle"></i> Auktorisera
+          </button>
+        </td>
+      </tr>`).join('');
+
+    document.querySelectorAll('[data-authorize-blocked]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const tag = btn.getAttribute('data-authorize-blocked');
+        authorizeBlocked(tag);
+      });
+    });
+  }
+
+  function authorizeBlocked(tag){
+    // Scroll to top and fill form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    resetForm();
+    $('#rfidTag').value = tag;
+    // Highlight the form
+    const formPanel = $('#rfid-form').closest('.content-panel');
+    formPanel.classList.add('highlight-pulse');
+    setTimeout(() => formPanel.classList.remove('highlight-pulse'), 2000);
+    
+    // Add a small info alert
+    UI.alert(`Fyll i uppgifter för tagg ${tag} och klicka på "Skapa RFID" för att auktorisera den.`, 'info');
+  }
+
+  async function clearBlockedRfids(){
+    if (!confirm('Vill du rensa listan på alla nekade RFID-försök?')) return;
+    try {
+      await UI.postJSON(API.clearBlockedRfids, {});
+      await refreshBlocked();
+    } catch (e) {
+      UI.alert(`Kunde inte rensa: ${e.message || e}`);
+    }
+  }
+
+  async function refreshBlocked(){
+    const role = (state.me?.role || '').toLowerCase();
+    if (role !== 'portal_admin' && role !== 'admin') return;
+    
+    try {
+      const data = await UI.getJSON(API.blockedRfids);
+      state.blockedItems = data.items || [];
+      renderBlockedTable();
+    } catch (e) {
+      console.error('Failed to refresh blocked RFIDs:', e);
+    }
   }
 
   async function refresh(){
@@ -485,11 +556,13 @@
     $('#rfid-form')?.addEventListener('submit', saveRfid);
     $('#btnToggleRfidList')?.addEventListener('click', toggleListExpanded);
     $('#btnToggleRfidAudit')?.addEventListener('click', toggleAuditExpanded);
+    $('#btnClearBlockedRfids')?.addEventListener('click', clearBlockedRfids);
 
     document.getElementById('btnDownloadRfidTemplate')?.addEventListener('click', downloadRfidTemplate);
     document.getElementById('btnImportRfids')?.addEventListener('click', importRfidsXlsx);
 
     await refresh();
+    await refreshBlocked();
   }
 
   document.addEventListener('DOMContentLoaded', () => {

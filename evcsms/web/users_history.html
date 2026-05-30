@@ -79,20 +79,23 @@
     </section>
 
     <div class="row g-3 align-items-end mb-3 toolbar-panel">
-      <div class="col-12 col-md-4" id="orgFilterWrap" style="display:none;">
-        <label for="orgFilter" class="form-label"><i class="bi bi-building"></i> Välj organisation</label>
+      <div class="col-12 col-md-3" id="orgFilterWrap" style="display:none;">
+        <label for="orgFilter" class="form-label"><i class="bi bi-building"></i> Organisation</label>
         <select id="orgFilter" class="form-select"><option value="">Alla organisationer</option></select>
       </div>
       <div class="col-6 col-md-2">
         <label for="days" class="form-label">Dagar</label>
         <input id="days" type="number" min="1" max="365" class="form-control" value="30">
       </div>
-      <div class="col-12 col-md-4" id="tagFilterWrap" style="display:none;">
-        <label for="tagFilter" class="form-label"><i class="bi bi-upc-scan"></i> RFID (valfritt)</label>
-        <input id="tagFilter" type="text" class="form-control" placeholder="Ex: 04AABBCCDD">
+      <div class="col-12 col-md-3">
+        <label for="histSearch" class="form-label"><i class="bi bi-search"></i> Sök i tabell</label>
+        <input id="histSearch" type="text" class="form-control" placeholder="Namn, RFID eller laddare...">
       </div>
-      <div class="col-12 col-md-2">
+      <div class="col-6 col-md-2">
         <button id="btnRefresh" class="btn btn-outline-secondary w-100" type="button"><i class="bi bi-arrow-clockwise"></i> Uppdatera</button>
+      </div>
+      <div class="col-6 col-md-2">
+        <button id="btnExport" class="btn btn-success w-100" type="button"><i class="bi bi-file-earmark-excel"></i> Export</button>
       </div>
     </div>
 

@@ -52,6 +52,7 @@ ORGS_FILE = BASE / "config" / "orgs.json"
 CPS_FILE = BASE / "config" / "cps.json"
 RFIDS_FILE = BASE / "config" / "rfids.json"
 RFID_AUDIT_FILE = BASE / "rfid_audit.json"
+BLOCKED_RFIDS_FILE = BASE / "blocked_rfids.json"
 API_KEYS_FILE = BASE / "config" / "api_keys.json"
 EXTERNAL_API_AUDIT_LOG = BASE / "external_api_audit.log"
 
@@ -632,6 +633,57 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
                 raise HTTPException(400, "Varje variabel måste ha component, variable och value")
         return {"variables": vars_list}
 
+    if command == "get_base_report":
+        return {
+            "report_base": str(payload.get("report_base", "FullInventory")),
+            "request_id": payload.get("request_id")
+        }
+
+    if command == "get_report":
+        return {
+            "variables": payload.get("variables", []),
+            "request_id": payload.get("request_id")
+        }
+
+    if command == "get_log":
+        url = (payload.get("remote_location") or "").strip()
+        if not url:
+            raise HTTPException(400, "remote_location krävs för get_log")
+        return {
+            "remote_location": url,
+            "log_type": str(payload.get("log_type", "DiagnosticsLog")),
+            "oldest_timestamp": payload.get("oldest_timestamp"),
+            "latest_timestamp": payload.get("latest_timestamp"),
+            "request_id": payload.get("request_id")
+        }
+
+    if command == "update_firmware":
+        loc = (payload.get("location") or "").strip()
+        if not loc:
+            raise HTTPException(400, "location krävs för update_firmware")
+        return {
+            "location": loc,
+            "retrieve_date_time": str(payload.get("retrieve_date_time") or ""),
+            "retries": payload.get("retries"),
+            "retry_interval": payload.get("retry_interval"),
+            "request_id": payload.get("request_id")
+        }
+
+    if command == "get_transaction_status":
+        return {"transaction_id": str(payload.get("transaction_id", ""))}
+
+    if command == "clear_display_message":
+        return {"id": _as_int(payload.get("id", 1), "id", minimum=1)}
+
+    if command == "customer_information":
+        return {
+            "customer_id": payload.get("customer_id"),
+            "id_token": payload.get("id_token"),
+            "report": bool(payload.get("report", True)),
+            "clear": bool(payload.get("clear", False)),
+            "request_id": payload.get("request_id")
+        }
+
     raise HTTPException(400, f"Ogiltigt command: {command}")
 
 
@@ -1018,7 +1070,26 @@ async def api_cps(session=Depends(require_auth)):
         visible = [cp for cp in all_cps if cp in allowed]
 
     aliases = {cp: (cps_meta.get(cp, {}).get("alias") or cp) for cp in visible}
-    return {"connected": visible, "aliases": aliases}
+    
+    # Include metadata if available
+    metadata = {}
+    for cp in visible:
+        cp_meta_raw = redis_client.get(f"cp_metadata:{cp}")
+        if cp_meta_raw:
+            metadata[cp] = json.loads(cp_meta_raw.decode())
+        else:
+            # Fallback to what's in cps.json
+            m = cps_meta.get(cp, {})
+            if isinstance(m, dict) and "vendor" in m:
+                metadata[cp] = {
+                    "vendor": m.get("vendor"),
+                    "model": m.get("model"),
+                    "serial": m.get("serial"),
+                    "firmware": m.get("firmware"),
+                    "ocpp_version": m.get("ocpp_version")
+                }
+
+    return {"connected": visible, "aliases": aliases, "metadata": metadata}
 
 # =====================================================================
 # EXTERNAL API KEY MANAGEMENT (ADMIN)
@@ -1148,6 +1219,13 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
         "get_configuration",
         "set_display_message",
         "set_variables",
+        "get_base_report",
+        "get_report",
+        "get_log",
+        "update_firmware",
+        "customer_information",
+        "clear_display_message",
+        "get_transaction_status",
     }
     if command not in allowed_commands:
         raise HTTPException(400, f"Ogiltigt command. Tillåtna: {', '.join(sorted(allowed_commands))}")
@@ -1319,6 +1397,17 @@ async def api_rfids_audit(limit: int = 200, session=Depends(require_installer_or
     limit = max(1, min(1000, int(limit)))
     return {"items": list(reversed(rows[-limit:])), "count": min(len(rows), limit)}
 
+@app.get("/api/blocked_rfids")
+async def api_blocked_rfids(session=Depends(require_portal_admin)):
+    """Returnerar lista på nekade RFID-försök."""
+    return {"items": load_json(BLOCKED_RFIDS_FILE, [])}
+
+@app.post("/api/blocked_rfids/clear")
+async def api_blocked_rfids_clear(session=Depends(require_portal_admin)):
+    """Rensar listan på nekade RFID-försök."""
+    save_json(BLOCKED_RFIDS_FILE, [])
+    return {"ok": True}
+
 @app.post("/api/rfids")
 async def api_rfids_create(body: RfidBody, session=Depends(require_org_admin_or_portal)):
     role = (session.get("role") or "").lower()
@@ -1361,6 +1450,14 @@ async def api_rfids_create(body: RfidBody, session=Depends(require_org_admin_or_
         save_users_map(users)
     if not auth_store.contains(tag):
         auth_store.add(tag)
+
+    # Ta bort från nekade listan om den fanns där
+    try:
+        blocked = load_json(BLOCKED_RFIDS_FILE, [])
+        if any(b.get("tag") == tag for b in blocked):
+            blocked = [b for b in blocked if b.get("tag") != tag]
+            save_json(BLOCKED_RFIDS_FILE, blocked)
+    except: pass
 
     append_rfid_audit(actor, "create", tag, {"org_id": org_id, "user_email": email, "alias": rfids[tag]["alias"]})
     return {"ok": True, "tag": tag}

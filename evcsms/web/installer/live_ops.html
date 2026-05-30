@@ -119,6 +119,13 @@
                       <option value="remote_start_transaction">Fjärrstart</option>
                       <option value="remote_stop_transaction">Fjärrstop</option>
                       <option value="get_configuration">Hämta konfiguration</option>
+                      <option value="set_variables">Konfigurera (OCPP 2.0.1)</option>
+                      <option value="set_display_message">Visa logotyp (OCPP 2.0.1)</option>
+                      <option value="get_base_report">Hämta basrapport (OCPP 2.0.1)</option>
+                      <option value="get_report">Hämta specifik rapport (OCPP 2.0.1)</option>
+                      <option value="get_log">Hämta loggar (OCPP 2.0.1)</option>
+                      <option value="update_firmware">Uppdatera firmware (OCPP 2.0.1)</option>
+                      <option value="customer_information">Kundinformation (OCPP 2.0.1)</option>
                     </select>
                   </div>
                   <div class="col-12 col-md-6" id="commandArgWrap">
@@ -145,6 +152,53 @@
                       <option value="AuthorizeRemoteTxRequests">AuthorizeRemoteTxRequests</option>
                       <option value="ConnectionTimeOut">ConnectionTimeOut</option>
                     </select>
+                  </div>
+                  <div class="col-12 col-md-6 d-none" id="displayMessageWrap">
+                    <label for="displayMessageUrl" class="form-label">Bild-URL (PNG/JPG)</label>
+                    <input id="displayMessageUrl" type="text" class="form-control" placeholder="https://...">
+                  </div>
+                  <div class="col-12 d-none" id="setVariablesWrap">
+                    <div class="row g-2">
+                      <div class="col-12 col-md-4" id="setVarComponentWrap">
+                        <label for="setVarComponent" class="form-label">Komponent</label>
+                        <input id="setVarComponent" type="text" class="form-control" placeholder="Ex: AuthCtrlr">
+                      </div>
+                      <div class="col-12 col-md-4" id="setVarVariableWrap">
+                        <label for="setVarVariable" class="form-label">Variabel</label>
+                        <input id="setVarVariable" type="text" class="form-control" placeholder="Ex: Enabled">
+                      </div>
+                      <div class="col-12 col-md-4" id="setVarValueWrap">
+                        <label for="setVarValue" class="form-label">Värde</label>
+                        <input id="setVarValue" type="text" class="form-control" placeholder="Ex: true">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-12 d-none" id="getLogWrap">
+                    <div class="row g-2">
+                      <div class="col-12 col-md-6">
+                        <label for="getLogUrl" class="form-label">Log-destination (URL)</label>
+                        <input id="getLogUrl" type="text" class="form-control" placeholder="ftp://user:pass@host/path">
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label for="getLogType" class="form-label">Log-typ</label>
+                        <select id="getLogType" class="form-select">
+                          <option value="DiagnosticsLog">DiagnosticsLog</option>
+                          <option value="SecurityLog">SecurityLog</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-12 d-none" id="updateFirmwareWrap">
+                    <div class="row g-2">
+                      <div class="col-12 col-md-8">
+                        <label for="fwLocation" class="form-label">Firmware URL</label>
+                        <input id="fwLocation" type="text" class="form-control" placeholder="https://...">
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label for="fwRetrieveDate" class="form-label">Hämta efter (ISO)</label>
+                        <input id="fwRetrieveDate" type="text" class="form-control" placeholder="2026-01-01T00:00:00Z">
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

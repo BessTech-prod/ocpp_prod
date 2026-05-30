@@ -41,10 +41,10 @@ venv.bak/
 # Docker
 .dockerignore
 
-# Logs
+# Data & Logs
+evcsms/blocked_rfids.json
+evcsms/data/blocked_rfids.json
 *.log
-
-# Temp files
 *.bak
 *.swp
 *~

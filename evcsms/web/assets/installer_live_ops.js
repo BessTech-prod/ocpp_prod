@@ -52,6 +52,31 @@
     get_configuration: {
       showConfigKeys: true,
     },
+    set_variables: {
+      showSetVariables: true,
+      showSetVarValue: true,
+    },
+    set_display_message: {
+      showDisplayMessage: true,
+    },
+    get_base_report: {
+      argLabel: 'Rapport-bas',
+      args: ['FullInventory', 'ConfigurationInventory', 'SummaryInventory'],
+      showConnector: false,
+    },
+    get_report: {
+      showSetVariables: true, // Reuse component/variable inputs
+      showSetVarValue: false,
+    },
+    get_log: {
+      showGetLog: true,
+    },
+    update_firmware: {
+      showUpdateFirmware: true,
+    },
+    customer_information: {
+      showIdTag: true,
+    },
   };
 
   const GET_CONFIGURATION_OPTIONS = [
@@ -59,6 +84,8 @@
     { value: 'HeartbeatInterval', label: 'HeartbeatInterval' },
     { value: 'AuthorizeRemoteTxRequests', label: 'AuthorizeRemoteTxRequests' },
     { value: 'ConnectionTimeOut', label: 'ConnectionTimeOut' },
+    { value: 'MeterValueSampleInterval', label: 'MeterValueSampleInterval' },
+    { value: 'TransactionMessageRetryInterval', label: 'TransactionMessageRetryInterval' },
   ];
 
   function esc(v){
@@ -221,6 +248,11 @@
     toggleField('#connectorWrap', !!cfg.showConnector);
     toggleField('#idTagWrap', !!cfg.showIdTag);
     toggleField('#configKeyWrap', !!cfg.showConfigKeys);
+    toggleField('#displayMessageWrap', !!cfg.showDisplayMessage);
+    toggleField('#setVariablesWrap', !!cfg.showSetVariables);
+    toggleField('#setVarValueWrap', !!cfg.showSetVarValue);
+    toggleField('#getLogWrap', !!cfg.showGetLog);
+    toggleField('#updateFirmwareWrap', !!cfg.showUpdateFirmware);
 
     const cfgSelect = $('#configKeySelect');
     if (cfgSelect && cfg.showConfigKeys) {
@@ -244,12 +276,20 @@
       try {
         const data = await UI.getJSON(API.commandStatus(commandId));
         if (statusEl){
+          statusEl.className = 'mt-2 fw-bold'; // Reset classes
           if (data.status === 'success') {
+            statusEl.classList.add('text-success');
             const details = data.response ? ` → ${JSON.stringify(data.response)}` : '';
-            statusEl.textContent = `Kommando klart (${data.command}) kl ${new Date().toLocaleTimeString()}${details}`;
+            statusEl.textContent = `✓ Kommando klart (${data.command}) kl ${new Date().toLocaleTimeString()}${details}`;
           }
-          else if (data.status === 'failed') statusEl.textContent = `Kommando misslyckades: ${data.error || 'okänt fel'}`;
-          else statusEl.textContent = `Kommando köat (${data.command})...`;
+          else if (data.status === 'failed') {
+            statusEl.classList.add('text-danger');
+            statusEl.textContent = `✗ Kommando misslyckades: ${data.error || 'okänt fel'}`;
+          }
+          else {
+            statusEl.classList.add('text-primary');
+            statusEl.textContent = `⏳ Kommando köat (${data.command})...`;
+          }
         }
         if (data.status === 'success' || data.status === 'failed' || attempts >= 20){
           clearInterval(state.statusTimer);
@@ -307,6 +347,43 @@
       payload.connector_id = connectorId;
     } else if (command === 'get_configuration') {
       if (configKeyValue && configKeyValue !== '__all__') payload.key = configKeyValue;
+    } else if (command === 'set_variables') {
+      const comp = ($('#setVarComponent')?.value || '').trim();
+      const variable = ($('#setVarVariable')?.value || '').trim();
+      const val = ($('#setVarValue')?.value || '').trim();
+      if (!comp || !variable || !val) {
+        UI.alert('Fyll i komponent, variabel och värde.');
+        return;
+      }
+      payload.variables = [{ component: comp, variable: variable, value: val }];
+    } else if (command === 'get_report') {
+      const comp = ($('#setVarComponent')?.value || '').trim();
+      const variable = ($('#setVarVariable')?.value || '').trim();
+      if (comp) {
+        payload.variables = [{ component: comp, variable: variable }];
+      }
+    } else if (command === 'get_base_report') {
+       payload.report_base = arg || 'FullInventory';
+    } else if (command === 'get_log') {
+       const url = ($('#getLogUrl')?.value || '').trim();
+       if (!url) { UI.alert('Ange en URL för log-uppladdning.'); return; }
+       payload.remote_location = url;
+       payload.log_type = $('#getLogType')?.value || 'DiagnosticsLog';
+    } else if (command === 'update_firmware') {
+       const loc = ($('#fwLocation')?.value || '').trim();
+       const date = ($('#fwRetrieveDate')?.value || '').trim();
+       if (!loc || !date) { UI.alert('Ange både URL och datum.'); return; }
+       payload.location = loc;
+       payload.retrieve_date_time = date;
+    } else if (command === 'customer_information') {
+       if (idTag) payload.id_token = { idToken: idTag, type: 'ISO14443' };
+    } else if (command === 'set_display_message') {
+      const url = ($('#displayMessageUrl')?.value || '').trim();
+      if (!url) {
+        UI.alert('Ange en bild-URL.');
+        return;
+      }
+      payload.url = url;
     }
 
     if (!confirmDangerousCommand(command, cpId, payload)){
@@ -348,6 +425,17 @@
     // Start the timer first so the page keeps polling even if the first request fails
     state.timer = setInterval(fetchLive, POLL_MS);
     await fetchLive();
+
+    // Check for CP parameter in URL for pre-selection
+    const urlParams = new URLSearchParams(window.location.search);
+    const preCp = urlParams.get('cp');
+    if (preCp) {
+       const sel = $('#cpPick');
+       if (sel) {
+         sel.value = preCp;
+         sel.dispatchEvent(new Event('change'));
+       }
+    }
 
     document.addEventListener('visibilitychange', ()=>{
       if (document.hidden && state.timer){

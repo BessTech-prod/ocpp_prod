@@ -85,6 +85,7 @@ ORGS_FILE = BASE / "config" / "orgs.json"
 CPS_FILE = BASE / "config" / "cps.json"
 TRANSACTIONS_FILE = BASE / "transactions.json"
 RFIDS_FILE = BASE / "config" / "rfids.json"
+BLOCKED_RFIDS_FILE = BASE / "blocked_rfids.json"
 
 # =====================================================================
 # REDIS CLIENT
@@ -173,7 +174,19 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
 
         if command == "get_base_report":
             rb = payload.get("report_base", "FullInventory")
-            return call201.GetBaseReport(request_id=int(uuid.uuid4().int % 2147483647), report_base=rb)
+            req_id = int(payload.get("request_id") or uuid.uuid4().int % 2147483647)
+            return call201.GetBaseReport(request_id=req_id, report_base=rb)
+
+        if command == "get_report":
+            req_id = int(payload.get("request_id") or uuid.uuid4().int % 2147483647)
+            vars_list = payload.get("variables", [])
+            cv_data = []
+            for v in vars_list:
+                cv_data.append({
+                    "component": {"name": v.get("component")},
+                    "variable": {"name": v.get("variable")}
+                })
+            return call201.GetReport(request_id=req_id, component_variable=cv_data)
 
         if command == "get_variables":
             vars_list = payload.get("variables", [])
@@ -187,6 +200,60 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
 
         if command == "get_transaction_status":
              return call201.GetTransactionStatus(transaction_id=str(payload.get("transaction_id", "")))
+
+        if command == "get_configuration":
+            # For 2.0.1, we map 'get_configuration' without keys to 'GetBaseReport'
+            # and with keys to 'GetVariables' (if keys are in Component:Variable format)
+            keys = payload.get("key")
+            if not keys:
+                return call201.GetBaseReport(request_id=int(uuid.uuid4().int % 2147483647), report_base="FullInventory")
+            
+            gv_data = []
+            for k in (keys if isinstance(keys, list) else [keys]):
+                parts = str(k).split(":", 1)
+                comp = parts[0]
+                var = parts[1] if len(parts) > 1 else "Enabled" # Default to 'Enabled' if variable missing
+                gv_data.append({"component": {"name": comp}, "variable": {"name": var}})
+            return call201.GetVariables(get_variable_data=gv_data)
+
+        if command == "get_log":
+            req_id = int(payload.get("request_id") or uuid.uuid4().int % 2147483647)
+            log_type = payload.get("log_type", "DiagnosticsLog")
+            remote_loc = payload.get("remote_location")
+            return call201.GetLog(
+                request_id=req_id,
+                log_type=log_type,
+                log={
+                    "remote_location": remote_loc,
+                    "oldest_timestamp": payload.get("oldest_timestamp"),
+                    "latest_timestamp": payload.get("latest_timestamp")
+                }
+            )
+
+        if command == "update_firmware":
+            req_id = int(payload.get("request_id") or uuid.uuid4().int % 2147483647)
+            return call201.UpdateFirmware(
+                request_id=req_id,
+                firmware={
+                    "location": payload.get("location"),
+                    "retrieve_date_time": payload.get("retrieve_date_time"),
+                    "retries": payload.get("retries"),
+                    "retry_interval": payload.get("retry_interval")
+                }
+            )
+
+        if command == "clear_display_message":
+            return call201.ClearDisplayMessage(id=int(payload.get("id", 1)))
+
+        if command == "customer_information":
+            req_id = int(payload.get("request_id") or uuid.uuid4().int % 2147483647)
+            return call201.CustomerInformation(
+                request_id=req_id,
+                report=payload.get("report", True),
+                clear=payload.get("clear", False),
+                customer_id=payload.get("customer_id"),
+                id_token=payload.get("id_token")
+            )
 
         raise ValueError(f"Command {command} not implemented for OCPP 2.0.1")
 
@@ -419,6 +486,37 @@ def org_for_cp(cp_id: str) -> str:
         return (entry.get("org_id") or "default").strip() or "default"
     return (entry or "default").strip() if isinstance(entry, str) else "default"
 
+def log_blocked_rfid(tag: str, cp_id: str):
+    """Logga en tagg som nekats auktorisering."""
+    tag = normalize_tag(tag)
+    if not tag or tag == "UNKNOWN":
+        return
+    try:
+        blocked = load_json(BLOCKED_RFIDS_FILE, [])
+        if not isinstance(blocked, list):
+            blocked = []
+        
+        # Spara tidpunkt och CP
+        entry = {
+            "tag": tag,
+            "cp_id": cp_id,
+            "timestamp": iso_now()
+        }
+        
+        # Behåll bara de senaste 50 unika nekade taggarna (per tagg+cp kombo eller bara tagg?)
+        # Vi kör per tagg och uppdaterar timestamp om den redan finns
+        for existing in blocked:
+            if existing.get("tag") == tag:
+                existing["timestamp"] = entry["timestamp"]
+                existing["cp_id"] = cp_id
+                break
+        else:
+            blocked.insert(0, entry)
+        
+        save_json(BLOCKED_RFIDS_FILE, blocked[:100])
+    except Exception as e:
+        logger.error("Failed to log blocked RFID: %s", e)
+
 def is_tag_allowed_on_cp(tag: str, cp_id: str) -> bool:
     """
     Policy:
@@ -541,6 +639,8 @@ class CentralSystemCP(CP):
         id_tag = normalize_tag(id_tag)
         self.track_tag(id_tag)
         ok = is_tag_allowed_on_cp(id_tag, self.id)
+        if not ok:
+            log_blocked_rfid(id_tag, self.id)
         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
         masked_tag = (id_tag[:4] + "***") if id_tag else "***"
         logger.info("[%s] Authorize id_tag=%s -> %s", self.id, masked_tag, status.value)
@@ -553,6 +653,8 @@ class CentralSystemCP(CP):
 
         id_tag = normalize_tag(id_tag)
         ok = is_tag_allowed_on_cp(id_tag, self.id)
+        if not ok:
+            log_blocked_rfid(id_tag, self.id)
         status = AuthorizationStatus.accepted if ok else AuthorizationStatus.blocked
 
         masked_tag = (id_tag[:4] + "***") if id_tag else "***"
@@ -752,6 +854,8 @@ class CentralSystemCP201(CP201):
         evse_id = kwargs.get("evse_id")
         self.track_tag(id_tag, evse_id)
         ok = is_tag_allowed_on_cp(id_tag, self.id)
+        if not ok:
+            log_blocked_rfid(id_tag, self.id)
         status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
         masked_tag = (id_tag[:4] + "***") if id_tag else "***"
         logger.info("[%s] Authorize (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
@@ -865,6 +969,8 @@ class CentralSystemCP201(CP201):
             
             # Perform authorization check
             ok = is_tag_allowed_on_cp(id_tag, self.id)
+            if not ok:
+                log_blocked_rfid(id_tag, self.id)
             status = get_enum_member(AuthorizationStatus201, "accepted") if ok else get_enum_member(AuthorizationStatus201, "blocked")
             id_token_info = {"status": status}
             

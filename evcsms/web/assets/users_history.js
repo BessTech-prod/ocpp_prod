@@ -70,18 +70,38 @@
     }
   }
 
-  async function fetchData(days, tag){
-    const qs=new URLSearchParams(); if(days) qs.set('days', String(days)); if(tag) qs.set('tag', tag);
-    const [hist, umap]=await Promise.all([UI.getJSON(`${API.hist}?${qs.toString()}`), UI.getJSON(API.umap)]);
-    return { hist, umap };
+  let LAST_HIST_DATA = null;
+  let LAST_UMAP_DATA = null;
+
+  function fetchData(days){
+    const qs=new URLSearchParams(); if(days) qs.set('days', String(days));
+    return Promise.all([UI.getJSON(`${API.hist}?${qs.toString()}`), UI.getJSON(API.umap)]);
   }
 
-  function render(hist, umap, role){
+  function render(role){
+    const hist = LAST_HIST_DATA;
+    const umap = LAST_UMAP_DATA;
+    if (!hist || !umap) return;
     const orgFilter=$('#orgFilter')?.value||'';
+    const searchVal=($('#histSearch')?.value||'').toLowerCase().trim();
     const rows=Array.isArray(hist?.items)?hist.items.slice():[];
     const tagOrg={}; Object.entries(umap||{}).forEach(([t,u])=> tagOrg[t]=u?.org_id||'');
+    
     let filtered=rows;
-    if((role==='portal_admin'||role==='admin') && orgFilter){ filtered=rows.filter(r=>(tagOrg[r.tag]||'')===orgFilter); }
+    if((role==='portal_admin'||role==='admin') && orgFilter){ 
+      filtered=rows.filter(r=>(tagOrg[r.tag]||'')===orgFilter); 
+    }
+    
+    // Client-side search
+    if (searchVal) {
+      filtered = filtered.filter(r => {
+        const name = (r.name || (umap?.[r.tag]?.name || [umap?.[r.tag]?.first_name, umap?.[r.tag]?.last_name].filter(Boolean).join(' ') || r.tag) || '').toLowerCase();
+        const tag = (r.tag || '').toLowerCase();
+        const cp = (r.charge_point_alias || r.charge_point || '').toLowerCase();
+        return name.includes(searchVal) || tag.includes(searchVal) || cp.includes(searchVal);
+      });
+    }
+
     filtered.sort((a,b)=> String(b.stop_time||'').localeCompare(String(a.stop_time||'')));
     LAST_ROLE = role;
     LAST_PERIOD_DAYS = String(hist?.period_days ?? '');
@@ -105,10 +125,16 @@
       const me = await UI.getJSON('/api/auth/me');
       const role=(me.role||'').toLowerCase();
       const days=Number(document.getElementById('days')?.value||30)||30;
-      const tag=(document.getElementById('tagFilter')?.value||'').trim()||undefined;
-      const {hist,umap}=await fetchData(days, tag);
-      render(hist, umap, role);
+      const [hist, umap] = await fetchData(days);
+      LAST_HIST_DATA = hist;
+      LAST_UMAP_DATA = umap;
+      render(role);
     }catch(e){ alertBox(`Kunde inte läsa historik: ${e.message}`); }
+  }
+
+  function doExport(){
+    const days=Number(document.getElementById('days')?.value||30)||30;
+    window.location.href = `/api/users/history/export.xlsx?days=${days}`;
   }
 
   function toggleHistoryList(){
@@ -118,10 +144,15 @@
 
   document.addEventListener('DOMContentLoaded', async ()=>{
     const me = await UI.initPage({ requiredRoles:['org_admin','portal_admin','admin'] }); if(!me) return;
-    await initOrgFilter((me.role||'').toLowerCase());
+    const role = (me.role||'').toLowerCase();
+    await initOrgFilter(role);
     document.getElementById('btnRefresh')?.addEventListener('click', refresh);
+    document.getElementById('btnExport')?.addEventListener('click', doExport);
     document.getElementById('btnToggleHistoryList')?.addEventListener('click', toggleHistoryList);
     document.getElementById('days')?.addEventListener('change', refresh);
+    document.getElementById('histSearch')?.addEventListener('input', () => {
+       render(role);
+    });
     await refresh();
   });
 })();

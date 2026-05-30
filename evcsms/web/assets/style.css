@@ -694,3 +694,15 @@ body:not(.app-ready) main .table-responsive::after {
   animation: shimmer 1.3s infinite linear;
 }
 
+
+
+/* Highlight pulse effect for guiding user */
+.highlight-pulse {
+  animation: highlight-pulse-animation 2s ease-in-out;
+}
+
+@keyframes highlight-pulse-animation {
+  0% { box-shadow: 0 12px 30px rgba(15, 23, 42, .05); border-color: rgba(226, 232, 240, .95); }
+  30% { box-shadow: 0 0 0 4px rgba(163, 0, 96, 0.4); border-color: var(--bs-primary); }
+  100% { box-shadow: 0 12px 30px rgba(15, 23, 42, .05); border-color: rgba(226, 232, 240, .95); }
+}
