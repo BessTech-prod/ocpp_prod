@@ -14,12 +14,25 @@ This guide provides the steps to deploy the latest EVCSMS platform updates (incl
 ---
 
 ## 2. Update the Codebase
-SSH into your VM and navigate to the project directory. Run the following to get the latest updates:
+SSH into your VM and navigate to the project directory. 
+
+### ⚠️ CRITICAL: Backup your Data
+Before pulling updates, manually copy your current data files to a safe location. This prevents any risk of Git overwriting your production history:
 ```bash
-cd ocpp_projekt2.0/evcsms
+# Create a backup folder
+mkdir -p ~/evcsms_backups/$(date +%Y%m%d)
+
+# Copy all current JSON data
+cp evcsms/config/*.json ~/evcsms_backups/$(date +%Y%m%d)/
+cp evcsms/data/*.json ~/evcsms_backups/$(date +%Y%m%d)/
+```
+
+### Pull latest code
+Run the following to get the latest updates:
+```bash
 git pull origin main
 ```
-*Note: This command will only update the system files. It will **not** affect your local `.env`, `api_keys.json`, `rfids.json`, `users.json`, or `transactions.json` files if you have not modified them in the repository.*
+*Note: We have updated the system to stop tracking data files in Git. After this pull, your `.json` files will be safe from future Git operations.*
 
 ---
 
