@@ -58,6 +58,6 @@ config/cps.json.bak.*
 docker/nginx.*.conf.bak.*
 web/assets/ui-common.js.bak.*
 web/index.html.bak.*
-recovery/
+/recovery/
 test_data_temp/
 .junie/
