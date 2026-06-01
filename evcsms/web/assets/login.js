@@ -20,6 +20,7 @@
   function goToRole(me){
     const role = (me.role || '').toLowerCase();
     if (role === 'portal_admin' || role === 'admin') window.location.href = '/portal/index';
+    else if (role === 'installer') window.location.href = '/installer/index';
     else if (role === 'org_admin') window.location.href = '/org/index';
     else window.location.href = '/user/index';
   }

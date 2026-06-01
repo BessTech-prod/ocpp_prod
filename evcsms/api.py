@@ -494,7 +494,7 @@ def _as_int(value: Any, field_name: str, *, minimum: Optional[int] = None) -> in
     return result
 
 
-def resolve_latest_transaction_id_for_cp(cp_id: str, connector_id: int) -> int:
+def resolve_latest_transaction_id_for_cp(cp_id: str, connector_id: int) -> Any:
     cp_id = (cp_id or "").strip()
     if not cp_id:
         raise HTTPException(400, "cp_id krävs för att hitta senaste transaktionen")
@@ -532,10 +532,11 @@ def resolve_latest_transaction_id_for_cp(cp_id: str, connector_id: int) -> int:
     if not candidates:
         raise HTTPException(409, f"Ingen aktiv transaktion hittades för {cp_id} på uttag {connector_id}")
 
-    latest = max(candidates, key=lambda tx: int(tx.get("transaction_id") or 0))
-    tx_id = int(latest.get("transaction_id") or 0)
-    if tx_id < 1:
-        raise HTTPException(409, "Senaste aktiva transaktionen saknar giltigt transaction_id")
+    # Sortera efter start_time istället för numeric ID för att stödja UUID:er (OCPP 2.0.1)
+    latest = max(candidates, key=lambda tx: str(tx.get("start_time") or ""))
+    tx_id = latest.get("transaction_id")
+    if tx_id is None:
+        raise HTTPException(409, "Senaste aktiva transaktionen saknar transaction_id")
     return tx_id
 
 
@@ -592,10 +593,16 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
 
     if command == "remote_stop_transaction":
         connector_id = _as_int(payload.get("connector_id", 1), "connector_id", minimum=1)
-        if payload.get("transaction_id") not in (None, ""):
+        tx_id_raw = payload.get("transaction_id")
+        if tx_id_raw not in (None, ""):
+            # Stöd både integer (1.6) och string/UUID (2.0.1)
+            try:
+                tx_id = int(tx_id_raw)
+            except (ValueError, TypeError):
+                tx_id = str(tx_id_raw)
             return {
                 "connector_id": connector_id,
-                "transaction_id": _as_int(payload.get("transaction_id"), "transaction_id", minimum=1),
+                "transaction_id": tx_id,
             }
         return {
             "connector_id": connector_id,
@@ -1028,23 +1035,68 @@ def allowed_cps_for_session(session: dict):
     return {cp for cp, meta in cps.items() if (meta.get("org_id") or "default") == oid}
 
 def fetch_status_map_for_cps(cps: List[str]) -> dict:
-    """Return connector status map for provided CP ids."""
+    """Return connector status map for provided CP ids, including latest meter and open tx info."""
     status_data = {cp_id: {} for cp_id in cps}
     wanted = set(cps)
-    status_keys = iter_redis_keys("connector_status:*")
+    
+    # 1. Fetch all connector statuses
+    status_keys = list(iter_redis_keys("connector_status:*"))
     for key in status_keys:
         key_str = key.decode()
         parts = key_str.split(":")
-        if len(parts) < 3:
-            continue
-        cp_id = parts[1]
-        if cp_id not in wanted:
-            continue
-        connector_id = int(parts[2])
-        raw = redis_client.get(key_str)
-        if not raw:
-            continue
-        status_data.setdefault(cp_id, {})[connector_id] = json.loads(raw.decode())
+        if len(parts) < 3: continue
+        cp_id, conn_id_str = parts[1], parts[2]
+        if cp_id not in wanted: continue
+        
+        try:
+            conn_id = int(conn_id_str)
+            raw = redis_client.get(key_str)
+            if raw:
+                status_data[cp_id][conn_id] = json.loads(raw.decode())
+        except: continue
+
+    # 2. Fetch latest meter readings
+    meter_keys = list(iter_redis_keys("latest_meter:*"))
+    for key in meter_keys:
+        key_str = key.decode()
+        parts = key_str.split(":")
+        if len(parts) < 3: continue
+        cp_id, conn_id_str = parts[1], parts[2]
+        if cp_id not in wanted: continue
+        
+        try:
+            conn_id = int(conn_id_str)
+            raw = redis_client.get(key_str)
+            if raw:
+                if conn_id not in status_data[cp_id]:
+                    status_data[cp_id][conn_id] = {}
+                status_data[cp_id][conn_id]["latest_meter"] = json.loads(raw.decode())
+        except: continue
+
+    # 3. Fetch open transactions to show live progress
+    tx_keys = list(iter_redis_keys("open_tx:*"))
+    for key in tx_keys:
+        raw = redis_client.get(key)
+        if not raw: continue
+        try:
+            tx = json.loads(raw.decode())
+            cp_id = tx.get("charge_point")
+            if cp_id not in wanted: continue
+            
+            conn_id = int(tx.get("connectorId") or 1)
+            if conn_id not in status_data[cp_id]:
+                status_data[cp_id][conn_id] = {}
+            
+            # Enrich with active transaction info
+            status_data[cp_id][conn_id]["active_transaction"] = {
+                "transaction_id": tx.get("transaction_id"),
+                "id_tag": tx.get("id_tag"),
+                "start_time": tx.get("start_time"),
+                "meter_start": tx.get("meter_start"),
+                "meter_now": tx.get("meter_stop") # meter_stop is updated during the tx as 'latest value'
+            }
+        except: continue
+
     return status_data
 
 @app.get("/api/cps")

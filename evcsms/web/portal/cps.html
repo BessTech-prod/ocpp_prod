@@ -9,12 +9,13 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="/assets/modern-installer.css">
 </head>
-<body class="bg-light">
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
+<body class="bg-light modern-ui">
+  <nav class="navbar navbar-expand-lg navbar-light px-3">
     <div class="container-fluid">
       <a href="javascript:void(0)" class="navbar-brand d-flex align-items-center js-go-dashboard">
-        <img src="/assets/logo_trans_vit.png" srcset="/assets/logo_trans_vit.png 2x" class="brand-logo" alt="TakoramaCharge">
+        <img src="/assets/logo_transparent.png" class="brand-logo" alt="TakoramaCharge">
       </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain"><span class="navbar-toggler-icon"></span></button>
       <div id="navMain" class="collapse navbar-collapse justify-content-end">
@@ -23,7 +24,7 @@
           <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/portal/live_ops.html"><i class="bi bi-broadcast-pin"></i> Live driftpanel</a></li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/portal/cps.html"><i class="bi bi-diagram-3"></i> Laddare</a></li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/instructions.html"><i class="bi bi-info-circle"></i> Instruktioner</a></li>
-          <li class="nav-item">
+          <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,installer">
             <a href="#" class="nav-link"
                data-route-portal="/portal/rfid.html"
                data-route-org="/org/rfid.html"
@@ -31,37 +32,37 @@
           </li>
 
           <!-- ROLL‑MEDVETNA LÄNKAR (gemensamma sidor) -->
-          <li class="nav-item">
+          <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,installer">
             <a href="#" class="nav-link"
                data-route-portal="/portal/add_user.html"
                data-route-org="/org/add_user.html"
                data-route-user="/user/index.html"><i class="bi bi-person-plus"></i> Användare</a>
           </li>
-          <li class="nav-item" data-visible-roles="portal_admin,admin,installer">
+          <li class="nav-item" data-visible-roles="portal_admin,admin">
             <a class="nav-link" href="/orgs.html">
               <i class="bi bi-building-gear"></i> Organisationer
             </a>
           </li>
-          <li class="nav-item" data-visible-roles="portal_admin,admin,installer">
+          <li class="nav-item" data-visible-roles="portal_admin,admin">
             <a class="nav-link" href="/portal/api_keys.html">
               <i class="bi bi-code-square"></i> Integrations
             </a>
           </li>
-          <li class="nav-item">
+          <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin">
             <a href="#" class="nav-link"
                data-route-portal="/users_history.html"
                data-route-org="/org/history.html"
                data-route-user="/user/index.html"><i class="bi bi-clock-history"></i> Historik</a>
           </li>
-          <li class="nav-item">
+          <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,user,installer">
             <a href="#" class="nav-link"
                data-route-portal="/my.html"
                data-route-org="/org/my.html"
                data-route-user="/user/my.html"><i class="bi bi-person-badge"></i> Min statistik</a>
           </li>
 
-          <li class="nav-item"><span id="me-display" class="navbar-text small text-light opacity-75"></span></li>
-          <li class="nav-item"><button id="btnLogout" class="btn btn-outline-light btn-sm" type="button"><i class="bi bi-box-arrow-right"></i> Logga ut</button></li>
+          <li class="nav-item"><span id="me-display" class="navbar-text small opacity-75"></span></li>
+          <li class="nav-item"><button id="btnLogout" class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-box-arrow-right"></i> Logga ut</button></li>
         </ul>
       </div>
     </div>
@@ -113,10 +114,10 @@
       </div>
     </div>
 
-    <h2 class="h5 mb-2">Alla laddare</h2>
-    <div class="table-responsive shadow-sm table-panel">
-      <table class="table table-sm table-striped align-middle" id="cps-table">
-        <thead class="table-dark"><tr><th>Alias</th><th>Laddare‑ID</th><th>Organisation</th><th class="text-end" style="width:260px;">Åtgärder</th></tr></thead>
+    <h2 class="h5 mb-3 fw-bold">Anslutna laddare</h2>
+    <div class="table-responsive shadow-sm border rounded-3 bg-white">
+      <table class="table table-hover align-middle mb-0" id="cps-table">
+        <thead class="bg-light"><tr><th>Alias</th><th>Laddare‑ID</th><th>Organisation</th><th class="text-end" style="width:260px;">Åtgärder</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>

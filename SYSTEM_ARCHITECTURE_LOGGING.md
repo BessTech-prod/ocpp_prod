@@ -65,7 +65,7 @@
 
 ┌─────────────────────────────────────┐
 │  EV CHARGING STATIONS               │
-│  (OCPP 1.6J compliant chargers)     │
+│  (OCPP 1.6J / 2.0.1 chargers)       │
 │  Connects to: port 9000             │
 │  Sends: heartbeat, status, events   │
 └─────────────────────────────────────┘

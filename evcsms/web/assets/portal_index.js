@@ -35,9 +35,39 @@
     });
 
     host.innerHTML = `
-      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Lediga uttag</div><div class="h3 m-0">${counters.available}</div></div></div></div>
-      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Laddar nu</div><div class="h3 m-0">${counters.charging}</div></div></div></div>
-      <div class="col-6 col-lg-4"><div class="card border-0 shadow-sm"><div class="card-body"><div class="small text-muted">Uttag ur drift</div><div class="h3 m-0">${counters.faulted}</div></div></div></div>`;
+      <div class="col-6 col-lg-4">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-check-circle text-success me-2"></i>
+              <div class="small text-muted font-weight-bold">LEDIGA UTTAG</div>
+            </div>
+            <div class="h2 m-0 font-weight-bold text-dark">${counters.available}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-4">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-lightning-charge text-primary me-2"></i>
+              <div class="small text-muted font-weight-bold">LADDAR NU</div>
+            </div>
+            <div class="h2 m-0 font-weight-bold text-dark">${counters.charging}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-4">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-1">
+              <i class="bi bi-exclamation-triangle text-danger me-2"></i>
+              <div class="small text-muted font-weight-bold">UR DRIFT</div>
+            </div>
+            <div class="h2 m-0 font-weight-bold text-dark">${counters.faulted}</div>
+          </div>
+        </div>
+      </div>`;
   }
 
   // ------- Org-filter (endast portal_admin/admin) -------
@@ -132,20 +162,23 @@
       col.innerHTML = `
         <div class="card border-0 shadow-sm h-100">
           <div class="card-body d-flex flex-column">
-            <h5 class="card-title d-flex align-items-center gap-2 mb-1">
-              <i class="bi bi-ev-front"></i> ${UI.esc(meta.alias || displayCpId(cpId))}
-              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge text-bg-secondary ms-auto">${UI.esc(ORGS_MAP[meta.org_id]?.name || meta.org_id)}</span>` : ''}
+            <h5 class="card-title d-flex align-items-center gap-2 mb-3">
+              <div class="icon-box bg-light rounded p-2 d-flex align-items-center justify-content-center">
+                <i class="bi bi-ev-front text-primary"></i>
+              </div>
+              <span class="ms-1">${UI.esc(meta.alias || displayCpId(cpId))}</span>
+              ${(ROLE==='portal_admin'||ROLE==='admin') && meta.org_id ? `<span class="badge bg-light text-muted border ms-auto">${UI.esc(ORGS_MAP[meta.org_id]?.name || meta.org_id)}</span>` : ''}
             </h5>
             <div class="small text-muted mb-3">ID: ${UI.esc(cpId)}</div>
             
-            <div class="row g-2 mb-3">
-              <div class="col-6">
-                <div class="small fw-bold">Uttag 1</div>
-                <span class="${UI.statusClass(c1?.status)}">${UI.statusLabelSv(c1?.status)}</span>
+            <div class="d-flex flex-column gap-2 mb-3">
+              <div class="d-flex justify-content-between align-items-center p-2 rounded-2 bg-light bg-opacity-50">
+                <span class="small fw-bold">Uttag 1</span>
+                <span class="badge ${UI.statusClass(c1?.status)}">${UI.statusLabelSv(c1?.status)}</span>
               </div>
-              <div class="col-6">
-                <div class="small fw-bold">Uttag 2</div>
-                <span class="${UI.statusClass(c2?.status)}">${UI.statusLabelSv(c2?.status)}</span>
+              <div class="d-flex justify-content-between align-items-center p-2 rounded-2 bg-light bg-opacity-50">
+                <span class="small fw-bold">Uttag 2</span>
+                <span class="badge ${UI.statusClass(c2?.status)}">${UI.statusLabelSv(c2?.status)}</span>
               </div>
             </div>
 
@@ -158,8 +191,8 @@
             </div>` : ''}
             
             <div class="mt-3">
-              <a href="/portal/live_ops.html?cp=${encodeURIComponent(cpId)}" class="btn btn-sm btn-outline-primary w-100">
-                <i class="bi bi-broadcast-pin"></i> Driftpanel
+              <a href="/portal/live_ops.html?cp=${encodeURIComponent(cpId)}" class="btn btn-sm btn-outline-primary w-100 py-2">
+                <i class="bi bi-broadcast-pin me-1"></i> Driftpanel
               </a>
             </div>
           </div>

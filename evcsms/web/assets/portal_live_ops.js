@@ -158,12 +158,22 @@
       const ts = it.status?.[1]?.timestamp || it.status?.[2]?.timestamp || '-';
       const orgName = state.orgs[it.org_id]?.name || it.org_id || 'default';
       return `<tr>
-        <td>${esc(it.alias || it.cp_id)} <span class="text-muted">(${esc(it.cp_id)})</span></td>
-        <td>${esc(orgName)} <span class="text-muted">(${esc(it.org_id || 'default')})</span></td>
+        <td>
+          <div class="fw-bold">${esc(it.alias || it.cp_id)}</div>
+          <div class="text-muted small">${esc(it.cp_id)}</div>
+        </td>
+        <td>
+          <div class="fw-medium">${esc(orgName)}</div>
+          <div class="text-muted small">${esc(it.org_id || 'default')}</div>
+        </td>
         <td>${statusBadge(c1)}</td>
         <td>${statusBadge(c2)}</td>
-        <td>${esc(ts)}</td>
-        <td class="text-end"><button class="btn btn-sm btn-outline-primary" data-manage="${esc(it.cp_id)}"><i class="bi bi-gear"></i> Hantera</button></td>
+        <td><div class="small text-muted">${esc(ts)}</div></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-white border shadow-sm" data-manage="${esc(it.cp_id)}">
+            <i class="bi bi-gear text-primary me-1"></i> Hantera
+          </button>
+        </td>
       </tr>`;
     }).join('');
 

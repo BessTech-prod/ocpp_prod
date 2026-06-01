@@ -2,14 +2,14 @@
 
 ## 1. SYSTEM OVERVIEW
 
-This is a multi-service, microservices-based EV Charging Station Management System (CSMS) that implements OCPP 1.6J protocol.
+This is a multi-service, microservices-based EV Charging Station Management System (CSMS) that implements OCPP 1.6J and 2.0.1 protocols.
 
 ### Core Technology Stack
 - **Backend**: Python 3.11 + FastAPI (REST API), websockets (OCPP)
 - **Frontend**: HTML5 + Bootstrap 5 + Vanilla JavaScript
 - **Data Layer**: JSON files (persistent) + Redis (runtime state)
 - **Infrastructure**: Docker Compose with 5 services
-- **Protocols**: OCPP 1.6J (WebSocket), HTTP/REST, JSON, HMAC-SHA256
+- **Protocols**: OCPP 1.6J and 2.0.1 (WebSocket), HTTP/REST, JSON, HMAC-SHA256
 
 ### Service Architecture
 
@@ -1063,3 +1063,17 @@ You now have a complete understanding of:
 - **How remote commands** are queued and executed
 - **Frontend-to-backend** integration patterns
 
+
+
+---
+
+## 11. MIXED PROTOCOL SUPPORT (1.6J & 2.0.1)
+
+The system is designed to handle both OCPP 1.6J and 2.0.1 chargers simultaneously on the same WebSocket endpoint. This requires careful handling of protocol-specific differences in data structures and identifiers.
+
+### Key Architectural Solutions:
+1.  **Standardized Transaction IDs**: While 1.6J uses integer IDs, 2.0.1 uses UUID strings. The system (API and OCPP service) has been updated to handle both types agnostically, using string comparisons and chronological sorting (by `start_time`) instead of numeric sorting.
+2.  **Redis Namespace Isolation**: Active transactions are stored in Redis using the key pattern `open_tx:{cp_id}:{tx_id}`. This ensures that even if two chargers generate the same transaction ID (unlikely with UUIDs, but possible in mixed environments), they do not collide.
+3.  **Backward Compatibility**: The system maintains a fallback mechanism to look up legacy `open_tx:{tx_id}` keys to ensure no data loss during migration or for long-running sessions.
+4.  **Feature Parity**: Features like `latest_meter` tracking (for live progress views) are implemented for both 1.6J and 2.0.1, despite 2.0.1 using the consolidated `TransactionEvent` message instead of discrete `MeterValues`.
+5.  **Robust Command Validation**: Commands like `RemoteStopTransaction` dynamically resolve the correct transaction ID type based on the target charger's protocol version.

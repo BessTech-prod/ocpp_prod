@@ -40,11 +40,14 @@
       return;
     }
     tbody.innerHTML=visibleRows.map(r=>{
-      const orgCell = (role==='portal_admin'||role==='admin'||role==='org_admin') ? `<td><code>${esc(r.org||'')}</code></td>` : '';
+      const orgCell = (role==='portal_admin'||role==='admin'||role==='org_admin') ? `<td><code class="text-muted bg-light px-2 py-1 rounded small">${esc(r.org||'')}</code></td>` : '';
       return `<tr>
-        <td>${esc(r.stop_time||'')}</td><td>${esc(r.name||'')}</td><td><code>${esc(r.tag||'')}</code></td>
-        <td>${esc(r.cp||'')}</td><td>${esc(String(r.connectorId??''))}</td>
-        <td>${esc(Number(r.energy_kwh??0).toLocaleString('sv-SE',{maximumFractionDigits:3}))}</td>
+        <td><div class="small fw-medium">${esc(r.stop_time||'')}</div></td>
+        <td><div class="fw-bold">${esc(r.name||'')}</div></td>
+        <td><code class="text-primary bg-light px-2 py-1 rounded small">${esc(r.tag||'')}</code></td>
+        <td>${esc(r.cp||'')}</td>
+        <td><span class="badge bg-light text-dark border">${esc(String(r.connectorId??''))}</span></td>
+        <td><div class="fw-bold text-primary">${esc(Number(r.energy_kwh??0).toLocaleString('sv-SE',{maximumFractionDigits:3}))}</div></td>
         ${orgCell}
       </tr>`;
     }).join('');

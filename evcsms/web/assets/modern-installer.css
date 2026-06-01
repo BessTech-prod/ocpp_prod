@@ -1,0 +1,532 @@
+/* modern-installer.css - Modern Minimalist Design Foundation */
+
+:root {
+  /* Design Tokens */
+  --mi-bg: #f1f5f9;
+  --mi-sidebar-bg: #1e293b;
+  --mi-sidebar-text: #f8fafc;
+  --mi-sidebar-hover: #334155;
+  --mi-card-bg: #ffffff;
+  --mi-text-main: #0f172a;
+  --mi-text-muted: #64748b;
+  --mi-accent: #e11d48; /* Slightly brighter rose/pink */
+  --mi-accent-hover: #be123c;
+  --mi-border: #e2e8f0;
+  --mi-radius: 0.75rem;
+  --mi-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --mi-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --mi-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  /* Status Colors */
+  --mi-success: #10b981;
+  --mi-info: #3b82f6;
+  --mi-warning: #f59e0b;
+  --mi-danger: #ef4444;
+}
+
+/* Layout & Typography */
+body.modern-ui {
+  background-color: var(--mi-bg);
+  color: var(--mi-text-main);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+
+  /* Prevent Flash of Unstyled Content (FOUC) and Layout Shift */
+  background-image: linear-gradient(to right, var(--mi-sidebar-bg) 260px, transparent 260px);
+  background-attachment: fixed;
+}
+
+/* Initially hide content to prevent "jump" before JS runs */
+.modern-ui:not(.layout-ready) main,
+.modern-ui:not(.layout-ready) .top-header,
+.modern-ui:not(.layout-ready) .sidebar {
+  opacity: 0;
+}
+
+/* Sidebar Layout */
+.modern-layout {
+  display: flex;
+  width: 100%;
+}
+
+.sidebar {
+  width: 260px;
+  height: 100vh;
+  position: fixed;
+  background-color: var(--mi-sidebar-bg);
+  color: var(--mi-sidebar-text);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  transition: all 0.3s ease;
+  opacity: 0; /* JS will reveal it */
+}
+
+.sidebar-brand {
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--mi-sidebar-hover);
+}
+
+.sidebar-brand img {
+  height: 52px;
+  width: auto;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+  /* filter: brightness(0) invert(1); */ /* User wants logo in color */
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 1rem 0;
+  overflow-y: auto;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  color: #94a3b8;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.sidebar-link i {
+  font-size: 1.1rem;
+}
+
+.sidebar-link:hover {
+  background-color: var(--mi-sidebar-hover);
+  color: #ffffff;
+}
+
+.sidebar-link.active {
+  background-color: var(--mi-sidebar-hover);
+  color: #ffffff;
+  border-right: 4px solid var(--mi-accent);
+}
+
+/* Horizontal Navbar Active Mark */
+.modern-ui .navbar-nav .nav-link {
+  position: relative;
+  font-weight: 500;
+}
+
+.modern-ui .navbar-nav .nav-link.active {
+  color: var(--mi-accent) !important;
+}
+
+.modern-ui .navbar-nav .nav-link.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0.5rem;
+  right: 0.5rem;
+  height: 3px;
+  background-color: var(--mi-accent);
+  border-radius: 3px 3px 0 0;
+}
+
+.sidebar-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--mi-sidebar-hover);
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background-color: rgba(255,255,255,0.05);
+}
+
+/* Main Content area */
+.main-content {
+  flex: 1;
+  margin-left: 260px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.modern-ui.layout-ready .main-content,
+.modern-ui.layout-ready .sidebar {
+  opacity: 1;
+}
+
+/* Smooth exit animation */
+.modern-ui.modern-ui-leaving .main-content {
+  opacity: 0;
+  transition: opacity 0.2s ease-in;
+}
+
+/* Page load progress bar simulation */
+.modern-ui::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--mi-accent);
+  z-index: 9999;
+  width: 0;
+  transition: width 0.3s ease;
+  pointer-events: none;
+}
+
+.modern-ui.modern-ui-leaving::after {
+  width: 70%;
+}
+
+.top-header {
+  height: 64px;
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--mi-border);
+  display: flex;
+  align-items: center;
+  padding: 0 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 999;
+}
+
+.content-body {
+  padding: 2rem;
+  flex: 1;
+}
+
+.modern-ui main.container {
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Hide legacy navbar when in modern layout */
+.modern-ui .navbar {
+  display: none !important;
+}
+
+/* Responsive Sidebar */
+@media (max-width: 991.98px) {
+  body.modern-ui {
+    background-image: none;
+  }
+  .sidebar {
+    transform: translateX(-100%);
+    opacity: 1 !important;
+  }
+  .main-content {
+    margin-left: 0;
+  }
+  .sidebar.show {
+    transform: translateX(0);
+  }
+  .modern-ui .navbar {
+    display: flex !important; /* Keep mobile navbar if needed, or implement toggle */
+  }
+}
+
+/* Components Styling (Retained & Refined) */
+.modern-ui .card,
+.modern-ui .content-panel,
+.modern-ui .toolbar-panel,
+.modern-ui .status-legend-panel {
+  background-color: var(--mi-card-bg) !important;
+  border: 1px solid var(--mi-border) !important;
+  border-radius: var(--mi-radius) !important;
+  box-shadow: var(--mi-shadow-sm) !important;
+  transition: all 0.2s ease;
+}
+
+.modern-ui .content-panel {
+  padding: 1.5rem !important;
+}
+
+.modern-ui .card:hover,
+.modern-ui .content-panel:hover {
+  box-shadow: var(--mi-shadow) !important;
+}
+
+.modern-ui .stats-grid .card {
+  border-top: 3px solid var(--mi-accent) !important;
+}
+
+.modern-ui .page-header {
+  margin-bottom: 2rem;
+  border-bottom: 2px solid var(--mi-border);
+  padding: 1.25rem 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.modern-ui .page-subtitle {
+  color: var(--mi-text-muted) !important;
+  font-size: 0.875rem !important;
+  margin-top: 0.25rem !important;
+}
+
+.modern-ui .badge {
+  font-weight: 600;
+  padding: 0.4em 0.8em;
+  border-radius: 0.375rem;
+  font-size: 0.8rem;
+}
+
+.modern-ui .badge.text-bg-secondary {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.modern-ui .status-available { background-color: #dcfce7 !important; color: #166534 !important; border: 1px solid #bbf7d0 !important; }
+.modern-ui .status-charging { background-color: #dbeafe !important; color: #1e40af !important; border: 1px solid #bfdbfe !important; }
+.modern-ui .status-faulted { background-color: #fee2e2 !important; color: #991b1b !important; border: 1px solid #fecaca !important; }
+
+/* Table Improvements */
+.modern-ui .table-panel {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid var(--mi-border);
+  overflow: hidden;
+}
+
+.modern-ui .table thead th,
+.modern-ui .import-result-header {
+  background: #f8fafc !important;
+  border-bottom: 1px solid var(--mi-border) !important;
+  color: var(--mi-text-muted) !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  text-transform: uppercase !important;
+  padding: 1rem !important;
+}
+
+.modern-ui .table tbody td {
+  padding: 1rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--mi-border);
+}
+
+.modern-ui .table-striped tbody tr:nth-of-type(odd) {
+  background-color: #f8fafc !important;
+}
+
+.modern-ui .table-hover tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.modern-ui .import-result-header {
+  border-radius: 0.75rem 0.75rem 0 0 !important;
+  border: 1px solid var(--mi-border) !important;
+  border-bottom: none !important;
+  display: grid !important;
+}
+
+.modern-ui .icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 0.5rem;
+  background-color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.modern-ui .card:hover .icon-box {
+  background-color: var(--mi-accent);
+}
+
+.modern-ui .card:hover .icon-box i {
+  color: #ffffff !important;
+}
+
+.modern-ui .text-primary {
+  color: var(--mi-accent) !important;
+}
+
+.modern-ui .text-danger { color: var(--mi-danger) !important; }
+.modern-ui .text-success { color: var(--mi-success) !important; }
+.modern-ui .text-warning { color: var(--mi-warning) !important; }
+.modern-ui .text-info { color: var(--mi-info) !important; }
+
+.modern-ui .btn-outline-primary {
+  color: var(--mi-accent);
+  border-color: var(--mi-accent);
+}
+
+.modern-ui .btn-outline-primary:hover {
+  background-color: var(--mi-accent);
+  border-color: var(--mi-accent);
+  color: #ffffff;
+}
+
+/* Form Controls */
+.modern-ui .form-control, .modern-ui .form-select {
+  border-radius: 0.5rem;
+  border: 1px solid var(--mi-border);
+  padding: 0.6rem 1rem;
+}
+
+.modern-ui .form-control:focus, .modern-ui .form-select:focus {
+  border-color: var(--mi-accent);
+  box-shadow: 0 0 0 3px rgba(163, 0, 96, 0.1);
+}
+
+.modern-ui .btn-primary {
+  background-color: var(--mi-accent);
+  border-color: var(--mi-accent);
+  border-radius: 0.5rem;
+  font-weight: 600;
+  padding: 0.6rem 1.2rem;
+}
+
+.modern-ui .btn-primary:hover {
+  background-color: var(--mi-accent-hover);
+  border-color: var(--mi-accent-hover);
+}
+
+.modern-ui .btn-white {
+  background-color: #ffffff;
+  color: var(--mi-text-main);
+  border: 1px solid var(--mi-border);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.modern-ui .btn-white:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.modern-ui .btn-secondary {
+  background-color: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+  border-radius: 0.5rem;
+  font-weight: 500;
+}
+
+.modern-ui hr {
+  border-top: 1px solid var(--mi-border) !important;
+  opacity: 0.5 !important;
+  margin: 2rem 0 !important;
+}
+
+.modern-ui .table-responsive.shadow-sm.border.rounded-3.bg-white {
+  border: 1px solid var(--mi-border) !important;
+  border-radius: var(--mi-radius) !important;
+  box-shadow: var(--mi-shadow-sm) !important;
+}
+
+.modern-ui .btn-secondary:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.modern-ui .btn-outline-secondary {
+  border-color: var(--mi-border);
+  color: var(--mi-text-muted);
+  border-radius: 0.5rem;
+}
+
+/* Instructions Page Specifics */
+.modern-ui .instruction-card {
+  cursor: pointer;
+  border: 1px solid var(--mi-border) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.modern-ui .instruction-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--mi-shadow-lg) !important;
+  border-color: var(--mi-accent) !important;
+}
+
+.modern-ui .icon-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.modern-ui .instruction-section {
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modern-ui .bg-dark.text-info {
+  background-color: #1e293b !important;
+  color: #38bdf8 !important;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+}
+
+.modern-ui .btn-outline-secondary:hover {
+  background-color: #f1f5f9;
+  color: var(--mi-text-main);
+  border-color: var(--mi-border);
+}
+
+.modern-ui .back-link {
+  color: var(--mi-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modern-ui .back-link:hover {
+  color: var(--mi-accent);
+}
+
+/* Utilities */
+.modern-ui .text-muted {
+  color: var(--mi-text-muted) !important;
+}
+
+.modern-ui .shadow-sm { box-shadow: var(--mi-shadow-sm) !important; }
+.modern-ui .shadow { box-shadow: var(--mi-shadow) !important; }
+.modern-ui .rounded-3 { border-radius: 0.75rem !important; }
+.modern-ui .rounded-4 { border-radius: 1rem !important; }
+
+.modern-ui hr {
+  border-top-color: var(--mi-border);
+  opacity: 1;
+}
+
+.modern-ui code {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.9em;
+}
+
+.modern-ui .btn-group .btn {
+  border-radius: 0.5rem;
+}
+
+.modern-ui .btn-group .btn:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.modern-ui .btn-group .btn:not(:first-child) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}

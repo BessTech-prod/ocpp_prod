@@ -37,10 +37,12 @@
     const allowDelete=(role==='portal_admin'||role==='admin'||role==='org_admin');
     tbody.innerHTML=rows.map(r=>`
       <tr>
-        <td>${esc(r.name)}</td>
-        <td><code>${esc(r.tag)}</code></td>
-        <td>${r.org?`<code>${esc(r.org)}</code>`:''}</td>
-        <td class="text-end">${allowDelete?`<button class="btn btn-sm btn-outline-danger" data-del="${esc(r.tag)}" type="button"><i class="bi bi-trash"></i> Ta bort</button>`:''}</td>
+        <td><div class="fw-bold">${esc(r.name)}</div></td>
+        <td><code class="text-primary bg-light px-2 py-1 rounded small">${esc(r.tag)}</code></td>
+        <td>${r.org?`<code class="text-muted bg-light px-2 py-1 rounded small">${esc(r.org)}</code>`:''}</td>
+        <td class="text-end">
+          ${allowDelete?`<button class="btn btn-sm btn-white border text-danger" data-del="${esc(r.tag)}" type="button"><i class="bi bi-trash"></i> Ta bort</button>`:''}
+        </td>
       </tr>`).join('');
     if(foot) foot.textContent=`Visar ${rows.length} användare.`;
     if(allowDelete){

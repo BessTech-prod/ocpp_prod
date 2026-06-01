@@ -33,7 +33,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', async ()=>{
-    const me = await UI.initPage({ requiredRoles:['user','org_admin','portal_admin','admin'] }); if(!me) return;
+    const me = await UI.initPage({ requiredRoles:['user','org_admin','portal_admin','admin','installer'] }); if(!me) return;
     const title=document.getElementById('title'); if(title) title.textContent=`Hej ${me.name||me.email}!`;
     fillAccountInfo(me);
     document.getElementById('btnRefresh')?.addEventListener('click', refresh);

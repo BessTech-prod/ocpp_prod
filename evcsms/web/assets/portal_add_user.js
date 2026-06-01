@@ -146,11 +146,16 @@
     if(!rows.length){ tbody.innerHTML=`<tr><td colspan="5" class="text-center text-muted">Inga användare.</td></tr>`; if(foot) foot.textContent=''; return; }
     tbody.innerHTML=visibleRows.map(r=>`
       <tr>
-        <td>${esc(r.name)}</td>
-        <td><code>${esc(r.alias)}</code></td>
-        <td><code>${esc(r.org)}</code></td>
-        <td><span class="badge ${r.role==='portal_admin'?'text-bg-danger':(r.role==='installer'?'text-bg-warning':'text-bg-secondary')}">${esc(r.role)}</span></td>
-        <td class="text-end"><button class="btn btn-sm btn-outline-primary" data-edit="${esc(r.tag)}" type="button"><i class="bi bi-pencil"></i> Redigera</button> <button class="btn btn-sm btn-outline-danger" data-del="${esc(r.tag)}" type="button"><i class="bi bi-trash"></i> Ta bort</button></td>
+        <td><div class="fw-bold">${esc(r.name)}</div></td>
+        <td><code class="text-primary bg-light px-2 py-1 rounded small">${esc(r.alias)}</code></td>
+        <td><code class="text-muted bg-light px-2 py-1 rounded small">${esc(r.org)}</code></td>
+        <td><span class="badge ${r.role==='portal_admin'?'status-faulted':(r.role==='installer'?'status-charging':'status-suspended')}">${esc(r.role)}</span></td>
+        <td class="text-end">
+          <div class="btn-group shadow-sm">
+            <button class="btn btn-sm btn-white border" data-edit="${esc(r.tag)}" type="button"><i class="bi bi-pencil text-primary"></i></button>
+            <button class="btn btn-sm btn-white border" data-del="${esc(r.tag)}" type="button"><i class="bi bi-trash text-danger"></i></button>
+          </div>
+        </td>
       </tr>`).join('');
     if(foot) foot.textContent='';
 

@@ -7,7 +7,7 @@
 **What it does**: Manages electric vehicle charging stations (charge points). Users swipe RFIDs to charge, portal admins monitor from a web dashboard.
 
 **Key Technologies**:
-- OCPP 1.6J (WebSocket protocol for charge points)
+- OCPP 1.6J and 2.0.1 (WebSocket protocol for charge points)
 - FastAPI (REST API for web UI)
 - Redis (runtime state: sessions, TX status, commands)
 - JSON files (persistent: users, RFIDs, orgs, charge points, transactions)
@@ -45,7 +45,7 @@ CP (physical charger)
   ├─ Generate tx_id (INCR Redis counter)
   ├─ Create transaction record
   ├─ Snapshot org/user metadata
-  ├─ Store in Redis open_tx:{id}
+  ├─ Store in Redis open_tx:{cp_id}:{id}
   ├─ Append to transactions.json
   └─ Return transaction_id to CP
   ↓ (charging happens)

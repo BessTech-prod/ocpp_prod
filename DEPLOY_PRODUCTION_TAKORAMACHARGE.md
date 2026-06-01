@@ -72,5 +72,13 @@ Your existing Nginx configuration (handled via Certbot) should continue to work 
 
 ---
 
+## 7. Data Recovery
+In the event of accidental data loss or corruption during an update, refer to the [RECOVERY_MANUAL.md](RECOVERY_MANUAL.md) for step-by-step instructions on:
+- Recovering data from Git's internal storage.
+- Extracting transactions from Redis logs.
+- Normalizing and merging recovered data.
+
+---
+
 **TakoramaCharge is now updated and ready for third-party integration.**
 

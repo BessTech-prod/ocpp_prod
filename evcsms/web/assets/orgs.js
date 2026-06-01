@@ -14,14 +14,18 @@
     const tbody=document.querySelector('#orgs-table tbody'); if(!tbody) return;
     const rows=Object.entries(orgs||{}).map(([id,o])=>`
       <tr>
-        <td><code>${esc(id)}</code></td>
+        <td><code class="text-primary bg-light px-2 py-1 rounded small">${esc(id)}</code></td>
         <td>
           <div class="input-group input-group-sm">
-            <input class="form-control" value="${esc(o?.name||'')}" data-name="${esc(id)}">
-            <button class="btn btn-outline-primary btn-save" data-id="${esc(id)}">Spara namn</button>
+            <input class="form-control" value="${esc(o?.name||'')}" data-name="${esc(id)}" style="max-width:300px;">
+            <button class="btn btn-white border btn-save" data-id="${esc(id)}"><i class="bi bi-check2 text-success"></i> Spara</button>
           </div>
         </td>
-        <td class="text-end"><button class="btn btn-sm btn-outline-danger btn-del" data-id="${esc(id)}">Ta bort</button></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-white border text-danger btn-del" data-id="${esc(id)}">
+            <i class="bi bi-trash"></i> Ta bort
+          </button>
+        </td>
       </tr>`).join('');
     tbody.innerHTML=rows || `<tr><td colspan="3" class="text-center text-muted">Inga orgar.</td></tr>`;
     $$('.btn-save').forEach(btn=>{

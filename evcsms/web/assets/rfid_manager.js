@@ -41,7 +41,7 @@
   }
 
   function tagStatusBadge(active){
-    return active ? '<span class="badge text-bg-success">Aktiv</span>' : '<span class="badge text-bg-secondary">Inaktiv</span>';
+    return active ? '<span class="badge status-available">Aktiv</span>' : '<span class="badge status-suspended">Inaktiv</span>';
   }
 
   function usersForSelect(orgId){
@@ -156,26 +156,30 @@
     if (role === 'org_admin') {
       tbody.innerHTML = visibleRows.map((r) => `
         <tr>
-          <td>${esc(r.alias || r.tag)}</td>
-          <td><code>${esc(r.tag)}</code></td>
-          <td>${esc(r.user_email || '-')}</td>
+          <td><div class="fw-bold">${esc(r.alias || r.tag)}</div></td>
+          <td><code class="text-primary bg-light px-2 py-1 rounded small">${esc(r.tag)}</code></td>
+          <td><div class="small text-muted">${esc(r.user_email || '-')}</div></td>
           <td>${tagStatusBadge(!!r.active)}</td>
           <td class="text-end">
-            <button class="btn btn-sm btn-outline-primary" data-edit="${esc(r.tag)}" type="button">Redigera</button>
-            <button class="btn btn-sm btn-outline-danger" data-del="${esc(r.tag)}" type="button">Ta bort</button>
+            <div class="btn-group shadow-sm">
+              <button class="btn btn-sm btn-white border" data-edit="${esc(r.tag)}" type="button"><i class="bi bi-pencil text-primary"></i></button>
+              <button class="btn btn-sm btn-white border" data-del="${esc(r.tag)}" type="button"><i class="bi bi-trash text-danger"></i></button>
+            </div>
           </td>
         </tr>`).join('');
     } else {
       tbody.innerHTML = visibleRows.map((r) => `
         <tr>
-          <td>${esc(r.alias || r.tag)}</td>
-          <td><code>${esc(r.tag)}</code></td>
-          <td>${esc(r.org_name || r.org_id || '')}</td>
-          <td>${esc(r.user_email || '-')}</td>
+          <td><div class="fw-bold">${esc(r.alias || r.tag)}</div></td>
+          <td><code class="text-primary bg-light px-2 py-1 rounded small">${esc(r.tag)}</code></td>
+          <td><div class="fw-medium">${esc(r.org_name || r.org_id || '')}</div></td>
+          <td><div class="small text-muted">${esc(r.user_email || '-')}</div></td>
           <td>${tagStatusBadge(!!r.active)}</td>
           <td class="text-end">
-            <button class="btn btn-sm btn-outline-primary" data-edit="${esc(r.tag)}" type="button">Redigera</button>
-            <button class="btn btn-sm btn-outline-danger" data-del="${esc(r.tag)}" type="button">Ta bort</button>
+            <div class="btn-group shadow-sm">
+              <button class="btn btn-sm btn-white border" data-edit="${esc(r.tag)}" type="button"><i class="bi bi-pencil text-primary"></i></button>
+              <button class="btn btn-sm btn-white border" data-del="${esc(r.tag)}" type="button"><i class="bi bi-trash text-danger"></i></button>
+            </div>
           </td>
         </tr>`).join('');
     }
@@ -403,7 +407,7 @@
 
   async function refreshBlocked(){
     const role = (state.me?.role || '').toLowerCase();
-    if (role !== 'portal_admin' && role !== 'admin') return;
+    if (role !== 'portal_admin' && role !== 'admin' && role !== 'installer') return;
     
     try {
       const data = await UI.getJSON(API.blockedRfids);

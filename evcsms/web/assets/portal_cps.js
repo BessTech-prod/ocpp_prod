@@ -62,15 +62,17 @@
 
     const rows = entries.map(([cp,meta])=>{
       const isUnassigned = !meta.org_id || meta.org_id === 'default';
-      const orgDisplay = isUnassigned ? '<span class="badge bg-warning text-dark">Ny</span>' : (state.orgs[meta.org_id]?.name || meta.org_id);
+      const orgDisplay = isUnassigned ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Ny</span>' : `<span class="fw-medium">${esc(state.orgs[meta.org_id]?.name || meta.org_id)}</span>`;
       return `
       <tr>
-        <td>${esc(meta.alias || cp)}</td>
-        <td><code>${esc(cp)}</code></td>
+        <td><div class="fw-bold">${esc(meta.alias || cp)}</div></td>
+        <td><code class="text-primary bg-light px-2 py-1 rounded small">${esc(cp)}</code></td>
         <td>${orgDisplay}</td>
         <td class="text-end">
-          <button class="btn btn-sm btn-outline-primary" data-edit="${esc(cp)}" type="button"><i class="bi bi-pencil"></i> Redigera</button>
-          <button class="btn btn-sm btn-outline-danger" data-unassign="${esc(cp)}" type="button"><i class="bi bi-trash"></i> Ta bort</button>
+          <div class="btn-group shadow-sm">
+            <button class="btn btn-sm btn-white border" data-edit="${esc(cp)}" type="button"><i class="bi bi-pencil text-primary"></i></button>
+            <button class="btn btn-sm btn-white border" data-unassign="${esc(cp)}" type="button"><i class="bi bi-trash text-danger"></i></button>
+          </div>
         </td>
       </tr>`;
     }).join('');

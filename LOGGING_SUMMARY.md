@@ -23,8 +23,8 @@ Your EV CSMS (Electric Vehicle Charging Management System) **DOES have comprehen
 
 2. **`ocpp_ws.py`** → Logger name: `"ocpp-ws"`
    - WebSocket charger connections/disconnections
-   - OCPP 1.6J protocol messages
-   - Charger status updates
+   - OCPP 1.6J and 2.0.1 protocol messages
+   - Charger status updates (StatusNotification / TransactionEvent)
    - Remote command execution
    - Authorization checks
 

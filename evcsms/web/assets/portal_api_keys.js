@@ -72,20 +72,20 @@
 
     elements.keysTable.innerHTML = keys.map(k => `
       <tr>
-        <td><strong>${UI.esc(k.org_id)}</strong></td>
-        <td><code class="small">${UI.esc(k.prefix)}</code></td>
-        <td class="small">${k.created_at ? k.created_at.split('T')[0] : '-'}</td>
-        <td class="small">${k.last_used ? k.last_used.replace('T', ' ').split('.')[0] : '<span class="text-muted">Aldrig</span>'}</td>
-        <td>${k.rate_limit}</td>
+        <td><div class="fw-bold">${UI.esc(k.org_id)}</div></td>
+        <td><code class="text-primary bg-light px-2 py-1 rounded small">${UI.esc(k.prefix)}</code></td>
+        <td><div class="small text-muted">${k.created_at ? k.created_at.split('T')[0] : '-'}</div></td>
+        <td><div class="small text-muted">${k.last_used ? k.last_used.replace('T', ' ').split('.')[0] : 'Aldrig'}</div></td>
+        <td><span class="badge bg-light text-dark border">${k.rate_limit}</span></td>
         <td>
-          <span class="badge ${k.active ? 'bg-success' : 'bg-secondary'}">
+          <span class="badge ${k.active ? 'status-available' : 'status-suspended'}">
             ${k.active ? 'Aktiv' : 'Inaktiv'}
           </span>
         </td>
         <td class="text-end">
-          <button class="btn btn-sm btn-outline-primary btn-review" 
+          <button class="btn btn-sm btn-white border shadow-sm btn-review" 
                   data-hash="${k.hash}">
-            <i class="bi bi-pencil-square"></i> Redigera
+            <i class="bi bi-pencil-square text-primary"></i>
           </button>
         </td>
       </tr>

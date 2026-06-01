@@ -66,7 +66,7 @@ from app.redis_config import build_redis_client
 # =====================================================================
 # LOGGNING
 # =====================================================================
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("ocpp-ws")
 
 # =====================================================================
@@ -685,7 +685,7 @@ class CentralSystemCP(CP):
         )
 
         # Store in Redis for active transactions
-        tx_key = f"open_tx:{tx_id}"
+        tx_key = f"open_tx:{self.id}:{tx_id}"
         self.redis.set(tx_key, json.dumps(entry))
 
         # Also append to persistent storage
@@ -712,11 +712,18 @@ class CentralSystemCP(CP):
     @on(Action.stop_transaction)
     async def on_stop_transaction(self, transaction_id, meter_stop, timestamp, **kwargs):
         logger.info("[%s] StopTransaction tx_id=%s", self.id, transaction_id)
-        tx_id = int(transaction_id)
-        tx_key = f"open_tx:{tx_id}"
+        tx_id = str(transaction_id)
+        
+        # Try new key format first, then fallback to legacy format
+        tx_key = f"open_tx:{self.id}:{tx_id}"
+        tx_data = self.redis.get(tx_key)
+        if not tx_data:
+            legacy_key = f"open_tx:{tx_id}"
+            tx_data = self.redis.get(legacy_key)
+            if tx_data:
+                tx_key = legacy_key
 
         # Get transaction from Redis
-        tx_data = self.redis.get(tx_key)
         if tx_data:
             entry = json.loads(tx_data)
             entry["stop_time"] = timestamp
@@ -739,6 +746,64 @@ class CentralSystemCP(CP):
                 logger.error("Failed to update transaction: %s", e)
 
         return call_result.StopTransaction()
+
+    @on(Action.meter_values)
+    async def on_meter_values(self, connector_id, meter_value, **kwargs):
+        logger.info("[%s] MeterValues connector=%s", self.id, connector_id)
+        try:
+            tx_id = kwargs.get("transaction_id")
+            latest_energy = None
+            for mv in meter_value:
+                # mv can be a dict if coming from library or a dataclass
+                mv_dict = make_json_safe(mv)
+                sampled_values = mv_dict.get("sampled_value") or mv_dict.get("sampledValue") or []
+                for sampled in sampled_values:
+                    measurand = sampled.get("measurand", "Energy.Active.Import.Register")
+                    if measurand == "Energy.Active.Import.Register":
+                        try:
+                            latest_energy = float(sampled.get("value", 0))
+                        except (ValueError, TypeError): pass
+
+                # Store latest sample in Redis for live view
+                self.redis.setex(f"latest_meter:{self.id}:{connector_id}", 3600, json.dumps(mv_dict))
+
+            if tx_id is not None and latest_energy is not None:
+                # Try new key format first, then legacy
+                tx_id_str = str(tx_id)
+                tx_key = f"open_tx:{self.id}:{tx_id_str}"
+                tx_data = self.redis.get(tx_key)
+                if not tx_data:
+                    legacy_key = f"open_tx:{tx_id_str}"
+                    tx_data = self.redis.get(legacy_key)
+                    if tx_data:
+                        tx_key = legacy_key
+                else:
+                    # tx_data is already fetched, no need to get again inside if
+                    pass
+
+                if tx_data:
+                    entry = json.loads(tx_data)
+                    if entry.get("charge_point") == self.id:
+                        entry["meter_stop"] = latest_energy
+                        self.redis.set(tx_key, json.dumps(entry))
+        except Exception as e:
+            logger.error("[%s] Failed to process MeterValues: %s", self.id, e)
+        return call_result.MeterValues()
+
+    @on(Action.data_transfer)
+    async def on_data_transfer(self, vendor_id, message_id=None, data=None, **kwargs):
+        logger.info("[%s] DataTransfer vendor=%s msg=%s", self.id, vendor_id, message_id)
+        return call_result.DataTransfer(status="Accepted")
+
+    @on(Action.diagnostics_status_notification)
+    async def on_diagnostics_status_notification(self, status, **kwargs):
+        logger.info("[%s] DiagnosticsStatusNotification status=%s", self.id, status)
+        return call_result.DiagnosticsStatusNotification()
+
+    @on(Action.firmware_status_notification)
+    async def on_firmware_status_notification(self, status, **kwargs):
+        logger.info("[%s] FirmwareStatusNotification status=%s", self.id, status)
+        return call_result.FirmwareStatusNotification()
 
 
 class CentralSystemCP201(CP201):
@@ -866,6 +931,16 @@ class CentralSystemCP201(CP201):
         logger.info("[%s] DataTransfer (v2.0.1) vendor=%s data=%s", self.id, vendor_id, kwargs)
         return call_result201.DataTransfer(status="Accepted")
 
+    @on(Action201.firmware_status_notification)
+    async def on_firmware_status_notification(self, status, **kwargs):
+        logger.info("[%s] FirmwareStatusNotification (v2.0.1) status=%s", self.id, status)
+        return call_result201.FirmwareStatusNotification()
+
+    @on(Action201.log_status_notification)
+    async def on_log_status_notification(self, status, **kwargs):
+        logger.info("[%s] LogStatusNotification (v2.0.1) status=%s", self.id, status)
+        return call_result201.LogStatusNotification()
+
     @on(Action201.transaction_event)
     async def on_transaction_event(self, event_type, timestamp, trigger_reason, seq_no, transaction_info, **kwargs):
         kwargs = make_json_safe(kwargs)
@@ -880,6 +955,13 @@ class CentralSystemCP201(CP201):
         # Safely extract evse_id
         evse_data = kwargs.get("evse") or {}
         evse_id = int(evse_data.get("id", 1))
+
+        # Track latest meter values for live monitoring
+        meter_values = kwargs.get("meter_value") or []
+        if meter_values:
+            try:
+                self.redis.setex(f"latest_meter:{self.id}:{evse_id}", 3600, json.dumps(make_json_safe(meter_values[0])))
+            except: pass
 
         if charging_state:
             status_map = {
@@ -978,7 +1060,6 @@ class CentralSystemCP201(CP201):
             logger.info("[%s] Transaction Started (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
 
             meter_start = 0.0
-            meter_values = kwargs.get("meter_value") or []
             for mv in meter_values:
                 for sampled in (mv.get("sampled_value") or mv.get("sampledValue") or []):
                     measurand = sampled.get("measurand", "Energy.Active.Import.Register")
@@ -1039,7 +1120,6 @@ class CentralSystemCP201(CP201):
                 entry["stop_time"] = timestamp
                 
                 meter_stop = entry.get("meter_start", 0.0)
-                meter_values = kwargs.get("meter_value") or []
                 for mv in meter_values:
                     for sampled in (mv.get("sampled_value") or mv.get("sampledValue") or []):
                         measurand = sampled.get("measurand", "Energy.Active.Import.Register")
