@@ -47,6 +47,17 @@ docker logs api-service 2>&1 | grep -i error | tail -20
 docker logs -f api-service 2>&1 | grep --line-buffered -i error
 ```
 
+## Configuring Log Level
+The system supports the `LOG_LEVEL` environment variable in all services. By default, it is set to `INFO`.
+
+You can change it in the `.env` file:
+```bash
+LOG_LEVEL=INFO
+```
+Supported values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
+
+Changing the level to `INFO` (default) silences verbose library noise (like WebSocket handshake attempts) while keeping important application events visible.
+
 ---
 
 ## What Gets Logged

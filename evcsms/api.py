@@ -27,7 +27,8 @@ from app.redis_config import build_redis_client
 # =====================================================================
 # LOGGNING
 # =====================================================================
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO), format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("api")
 
 # =====================================================================

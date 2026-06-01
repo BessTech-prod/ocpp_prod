@@ -221,14 +221,14 @@ bash diagnose_outage.sh
 
 ## Recommended Improvements
 
-### **1. Enable Persistent Logging (Easy)**
-Create `.env` variable for log output:
+### **1. Configurable Logging (Implemented)**
+The system supports the `LOG_LEVEL` environment variable in all services (`api`, `ocpp-ws`, `backup`, `main`).
+
+In your `.env` file:
 ```bash
 LOG_LEVEL=INFO
-LOG_DIR=/data/logs
 ```
-
-Then modify containers to log to `/data/logs/*.log` files
+Supported levels: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
 
 ### **2. Add Monitoring (Medium)**
 Create a cron job that runs `diagnose_outage.sh` every 5 minutes and stores results

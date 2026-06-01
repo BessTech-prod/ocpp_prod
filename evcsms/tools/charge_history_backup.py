@@ -17,7 +17,9 @@ if str(ROOT) not in sys.path:
 from app.history_backup import BackupConfig, run_backup_once, run_scheduler
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+import os
+
+logging.basicConfig(level=getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO), format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("charge-history-backup")
 
 
