@@ -433,8 +433,10 @@ def save_json(path: Path, data):
             except: pass
         raise
 
-def normalize_tag(tag: str) -> str:
-    return (tag or "").strip().upper()
+def normalize_tag(tag: Any) -> str:
+    if tag is None:
+        return ""
+    return str(tag).strip().upper()
 
 def load_rfids_map() -> dict:
     return load_json(RFIDS_FILE, {})
@@ -900,7 +902,7 @@ class CentralSystemCP201(CP201):
 
     @on(Action201.status_notification)
     async def on_status_notification(self, timestamp, connector_status, evse_id, connector_id=None, **kwargs):
-        evse_id = int(evse_id)
+        evse_id = int(evse_id or kwargs.get("evseId", 1))
         status_val = make_json_safe(connector_status)
         logger.info("[%s] StatusNotification (v2.0.1) evse=%s status=%s", self.id, evse_id, status_val)
         status_key = f"connector_status:{self.id}:{evse_id}"
@@ -917,7 +919,7 @@ class CentralSystemCP201(CP201):
         token_dict = make_json_safe(id_token) if id_token else {}
         id_tag = normalize_tag(token_dict.get("id_token") or token_dict.get("idToken"))
         # evse_id is optional in Authorize
-        evse_id = kwargs.get("evse_id")
+        evse_id = kwargs.get("evse_id") or kwargs.get("evseId")
         self.track_tag(id_tag, evse_id)
         ok = is_tag_allowed_on_cp(id_tag, self.id)
         if not ok:
@@ -954,11 +956,14 @@ class CentralSystemCP201(CP201):
         charging_state = tx_dict.get("charging_state") or tx_dict.get("chargingState")
         
         # Safely extract evse_id
-        evse_data = kwargs.get("evse") or {}
-        evse_id = int(evse_data.get("id", 1))
+        evse_data = kwargs.get("evse") or kwargs.get("evseId") or {}
+        if isinstance(evse_data, (int, str)):
+             evse_id = int(evse_data)
+        else:
+             evse_id = int(evse_data.get("id") or evse_data.get("evseId") or 1)
 
         # Track latest meter values for live monitoring
-        meter_values = kwargs.get("meter_value") or []
+        meter_values = kwargs.get("meter_value") or kwargs.get("meterValue") or []
         if meter_values:
             try:
                 self.redis.setex(f"latest_meter:{self.id}:{evse_id}", 3600, json.dumps(make_json_safe(meter_values[0])))
@@ -989,10 +994,10 @@ class CentralSystemCP201(CP201):
 
         id_token_info = None
         if event_type == "Started":
-            id_token = kwargs.get("id_token")
+            id_token = kwargs.get("id_token") or kwargs.get("idToken")
             token_dict = make_json_safe(id_token) if id_token else {}
 
-            remote_start_id = kwargs.get("remote_start_id")
+            remote_start_id = kwargs.get("remote_start_id") or kwargs.get("remoteStartId")
             remote_tag = None
             if remote_start_id is not None:
                 rid = int(remote_start_id)

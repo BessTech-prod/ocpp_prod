@@ -48,8 +48,10 @@ def iso_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
-def normalize_tag(tag: str) -> str:
-    return (tag or "").strip().upper()
+def normalize_tag(tag: Any) -> str:
+    if tag is None:
+        return ""
+    return str(tag).strip().upper()
 
 
 def normalize_email(email: str | None) -> str | None:
