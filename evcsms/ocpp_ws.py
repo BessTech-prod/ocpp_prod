@@ -1071,7 +1071,11 @@ class CentralSystemCP201(CP201):
                     measurand = sampled.get("measurand", "Energy.Active.Import.Register")
                     if measurand == "Energy.Active.Import.Register":
                         try:
-                            meter_start = float(sampled.get("value", 0))
+                            val = float(sampled.get("value", 0))
+                            context = sampled.get("context")
+                            # Prefer Transaction.Begin context if present
+                            if context == "Transaction.Begin" or not context:
+                                meter_start = val
                         except (ValueError, TypeError): pass
 
             rfids = load_rfids_map()
@@ -1125,16 +1129,44 @@ class CentralSystemCP201(CP201):
                 entry = json.loads(tx_data)
                 entry["stop_time"] = timestamp
                 
-                meter_stop = entry.get("meter_start", 0.0)
+                # In Ended events, some chargers send both Begin and End meter values.
+                meter_start = entry.get("meter_start", 0.0)
+                meter_stop = entry.get("meter_stop") or meter_start
                 for mv in meter_values:
                     for sampled in (mv.get("sampled_value") or mv.get("sampledValue") or []):
                         measurand = sampled.get("measurand", "Energy.Active.Import.Register")
                         if measurand == "Energy.Active.Import.Register":
                             try:
-                                meter_stop = float(sampled.get("value", 0))
+                                val = float(sampled.get("value", 0))
+                                context = sampled.get("context")
+                                if context == "Transaction.Begin":
+                                    meter_start = val
+                                elif context == "Transaction.End" or not context:
+                                    meter_stop = val
                             except (ValueError, TypeError): pass
                 
+                entry["meter_start"] = meter_start
                 entry["meter_stop"] = meter_stop
+
+                # If the tag is still unknown, try to resolve it from the Ended event's idToken
+                if entry.get("id_tag") == "UNKNOWN" or not entry.get("id_tag"):
+                    id_token = kwargs.get("id_token") or kwargs.get("idToken")
+                    if id_token:
+                        token_dict = make_json_safe(id_token)
+                        id_tag = normalize_tag(token_dict.get("id_token") or token_dict.get("idToken"))
+                        if id_tag and id_tag != "UNKNOWN":
+                            entry["id_tag"] = id_tag
+                            # Re-enrich with new tag info
+                            try:
+                                entry = enrich_transaction_snapshot(
+                                    entry,
+                                    rfids_map=load_rfids_map(),
+                                    cps_map=load_json(CPS_FILE, {}),
+                                    users_map=load_json(USERS_FILE, {}),
+                                    orgs_map=load_json(ORGS_FILE, {}),
+                                )
+                            except: pass
+
                 self.redis.delete(tx_key)
                 try:
                     txs = load_json(TRANSACTIONS_FILE, [])

@@ -1,5 +1,6 @@
 
 import sys
+import json
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -132,6 +133,54 @@ class TestOCPP201Fixes(unittest.TestCase):
             mock_redis.setex.assert_any_call("last_tag:test_cp", 3600, "TAG789")
 
         asyncio.run(run_test())
+
+    @patch("ocpp_ws.redis_client")
+    @patch("ocpp_ws.load_rfids_map", return_value={})
+    @patch("ocpp_ws.load_json", return_value={})
+    @patch("ocpp_ws.save_json")
+    @patch("ocpp_ws.enrich_transaction_snapshot", side_effect=lambda x, **kwargs: x)
+    def test_on_transaction_event_ended_with_begin_meter(self, mock_enrich, mock_save, mock_load, mock_rfids, mock_redis):
+        cp = CentralSystemCP201("test_cp", MagicMock())
+        cp.redis = mock_redis
+        
+        tx_id = "tx123"
+        initial_entry = {
+            "transaction_id": tx_id,
+            "charge_point": "test_cp",
+            "connectorId": 1,
+            "id_tag": "UNKNOWN",
+            "meter_start": 0.0,
+            "start_time": "2026-06-04T07:58:35Z"
+        }
+        mock_redis.get.return_value = json.dumps(initial_entry).encode()
+        
+        import asyncio
+        async def run_test():
+            await cp.on_transaction_event(
+                event_type="Ended",
+                timestamp="2026-06-04T11:03:37Z",
+                trigger_reason="EVCommunicationLost",
+                seq_no=16,
+                transaction_info={"transactionId": tx_id},
+                meterValue=[
+                    {
+                        "sampledValue": [{"context": "Transaction.Begin", "measurand": "Energy.Active.Import.Register", "value": 100.0}]
+                    },
+                    {
+                        "sampledValue": [{"context": "Transaction.End", "measurand": "Energy.Active.Import.Register", "value": 150.0}]
+                    }
+                ],
+                idToken={"idToken": "new_tag"}
+            )
+        
+        asyncio.run(run_test())
+        
+        # Verify that meter_start was updated and id_tag was updated
+        txs = mock_save.call_args[0][1]
+        entry = txs[-1]
+        self.assertEqual(entry["meter_start"], 100.0)
+        self.assertEqual(entry["meter_stop"], 150.0)
+        self.assertEqual(entry["id_tag"], "NEW_TAG")
 
 if __name__ == "__main__":
     unittest.main()
