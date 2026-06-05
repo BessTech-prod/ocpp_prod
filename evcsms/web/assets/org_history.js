@@ -57,7 +57,7 @@
       stop_time : r.stop_time||'',
       name      : nameOf(r.tag, r.name),
       tag       : r.tag||'',
-      charge_box: r.charge_point? String(r.charge_point).split('/').pop() : '',
+      charge_box: r.charge_point_alias || (r.charge_point? String(r.charge_point).split('/').pop() : ''),
       connector : (r.connectorId??''),
       energy_kwh: (typeof r.energy_kwh==='number' ? r.energy_kwh : Number(r.energy_kwh||0))
     }));
