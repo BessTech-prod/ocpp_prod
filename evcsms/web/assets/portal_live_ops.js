@@ -408,6 +408,9 @@
         return;
       }
       payload.url = url;
+      payload.priority = $('#displayPriority')?.value || 'NormalCycle';
+      const msgState = ($('#displayState')?.value || '').trim();
+      if (msgState) payload.state = msgState;
     }
 
     if (!confirmDangerousCommand(command, cpId, payload)){

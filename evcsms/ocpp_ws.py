@@ -32,6 +32,7 @@ try:
         AuthorizationStatusEnumType as AuthorizationStatus201,
         MessagePriorityEnumType as MessagePriority201,
         MessageFormatEnumType as MessageFormat201,
+        MessageStateEnumType as MessageState201,
     )
 except ImportError:
     try:
@@ -41,6 +42,7 @@ except ImportError:
             AuthorizationStatusType as AuthorizationStatus201,
             MessagePriorityType as MessagePriority201,
             MessageFormatType as MessageFormat201,
+            MessageStateType as MessageState201,
         )
     except ImportError:
         from ocpp.v201.enums import (
@@ -49,6 +51,7 @@ except ImportError:
             AuthorizationStatus as AuthorizationStatus201,
             MessagePriority as MessagePriority201,
             MessageFormat as MessageFormat201,
+            MessageState as MessageState201,
         )
 
 # Helper to get enum members that might be lowercase or uppercase
@@ -137,17 +140,19 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
         if command == "set_display_message":
             url = payload.get("url")
             priority = payload.get("priority", "NormalCycle")
+            msg_state = payload.get("state")
             msg_id = int(payload.get("id", 1))
-            return call201.SetDisplayMessage(
-                message={
-                    "id": msg_id,
-                    "priority": get_enum_member(MessagePriority201, priority),
-                    "message": {
-                        "format": get_enum_member(MessageFormat201, "URI"),
-                        "content": url
-                    }
+            message_obj = {
+                "id": msg_id,
+                "priority": get_enum_member(MessagePriority201, priority),
+                "message": {
+                    "format": get_enum_member(MessageFormat201, "URI"),
+                    "content": url
                 }
-            )
+            }
+            if msg_state:
+                message_obj["state"] = get_enum_member(MessageState201, msg_state)
+            return call201.SetDisplayMessage(message=message_obj)
         if command == "set_variables":
             variables = payload.get("variables", [])
             set_var_data = []

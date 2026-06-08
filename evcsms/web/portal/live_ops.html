@@ -154,17 +154,39 @@
                       <option value="ConnectionTimeOut">ConnectionTimeOut</option>
                     </select>
                   </div>
-                  <div class="col-12 col-md-6 d-none" id="displayMessageWrap">
-                    <div id="presetPickWrap">
-                      <label for="presetPick" class="form-label">Bildpreset</label>
-                      <select id="presetPick" class="form-select">
-                        <option value="">Välj preset...</option>
-                        <option value="__custom__">Egen URL...</option>
-                      </select>
-                    </div>
-                    <div id="customUrlWrap" class="mt-2 d-none">
-                      <label for="displayMessageUrl" class="form-label">Bild-URL (PNG/JPG)</label>
-                      <input id="displayMessageUrl" type="text" class="form-control" placeholder="https://...">
+                  <div class="col-12 d-none" id="displayMessageWrap">
+                    <div class="row g-2">
+                      <div class="col-12 col-md-4">
+                        <div id="presetPickWrap">
+                          <label for="presetPick" class="form-label">Bildpreset</label>
+                          <select id="presetPick" class="form-select">
+                            <option value="">Välj preset...</option>
+                            <option value="__custom__">Egen URL...</option>
+                          </select>
+                        </div>
+                        <div id="customUrlWrap" class="mt-2 d-none">
+                          <label for="displayMessageUrl" class="form-label">Bild-URL (PNG/JPG)</label>
+                          <input id="displayMessageUrl" type="text" class="form-control" placeholder="https://...">
+                        </div>
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label for="displayPriority" class="form-label">Prioritet</label>
+                        <select id="displayPriority" class="form-select">
+                          <option value="NormalCycle" selected>NormalCycle — Visas i rotation</option>
+                          <option value="InFront">InFront — Visas framför rotation</option>
+                          <option value="AlwaysFront">AlwaysFront — Alltid överst</option>
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label for="displayState" class="form-label">Visa vid status</label>
+                        <select id="displayState" class="form-select">
+                          <option value="" selected>Alla statusar</option>
+                          <option value="Idle">Idle — Ingen laddning</option>
+                          <option value="Charging">Charging — Under laddning</option>
+                          <option value="Faulted">Faulted — Felstatus</option>
+                          <option value="Unavailable">Unavailable — Ur drift</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                   <div class="col-12 d-none" id="setVariablesWrap">

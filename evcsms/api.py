@@ -641,11 +641,20 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
         url = (payload.get("url") or "").strip()
         if not url:
             raise HTTPException(400, "url krävs för set_display_message")
-        return {
+        valid_priorities = {"AlwaysFront", "InFront", "NormalCycle"}
+        priority = str(payload.get("priority", "NormalCycle")).strip()
+        if priority not in valid_priorities:
+            priority = "NormalCycle"
+        valid_states = {"Idle", "Charging", "Faulted", "Unavailable"}
+        state_val = str(payload.get("state", "")).strip()
+        result = {
             "url": url,
-            "priority": str(payload.get("priority", "Normal")).strip() or "Normal",
+            "priority": priority,
             "id": _as_int(payload.get("id", 1), "id", minimum=1)
         }
+        if state_val in valid_states:
+            result["state"] = state_val
+        return result
 
     if command == "set_variables":
         vars_list = payload.get("variables")
