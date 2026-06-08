@@ -155,8 +155,17 @@
                     </select>
                   </div>
                   <div class="col-12 col-md-6 d-none" id="displayMessageWrap">
-                    <label for="displayMessageUrl" class="form-label">Bild-URL (PNG/JPG)</label>
-                    <input id="displayMessageUrl" type="text" class="form-control" placeholder="https://...">
+                    <div id="presetPickWrap">
+                      <label for="presetPick" class="form-label">Bildpreset</label>
+                      <select id="presetPick" class="form-select">
+                        <option value="">Välj preset...</option>
+                        <option value="__custom__">Egen URL...</option>
+                      </select>
+                    </div>
+                    <div id="customUrlWrap" class="mt-2 d-none">
+                      <label for="displayMessageUrl" class="form-label">Bild-URL (PNG/JPG)</label>
+                      <input id="displayMessageUrl" type="text" class="form-control" placeholder="https://...">
+                    </div>
                   </div>
                   <div class="col-12 d-none" id="setVariablesWrap">
                     <div class="row g-2">
@@ -205,6 +214,37 @@
               </div>
             </div>
             <div class="small text-muted mt-2" id="commandStatus">Inget kommando skickat ännu.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4 d-none" id="managePresetsWrap">
+      <div class="col-12">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <h2 class="h5 mb-3">
+              <a class="text-decoration-none" data-bs-toggle="collapse" href="#presetManagerBody" role="button" aria-expanded="false" aria-controls="presetManagerBody">
+                <i class="bi bi-images"></i> Hantera bildpresets <i class="bi bi-chevron-down small"></i>
+              </a>
+            </h2>
+            <div class="collapse" id="presetManagerBody">
+              <div class="row g-2 mb-3 align-items-end">
+                <div class="col-12 col-md-4">
+                  <label for="presetFile" class="form-label">Välj bild</label>
+                  <input id="presetFile" type="file" class="form-control" accept="image/png,image/jpeg,image/webp">
+                  <div class="form-text">Filtyper som stöds: PNG, JPG, WEBP (max 5 MB)</div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label for="presetName" class="form-label">Presetnamn</label>
+                  <input id="presetName" type="text" class="form-control" placeholder="Ex: Företagslogotyp">
+                </div>
+                <div class="col-12 col-md-4">
+                  <button id="btnUploadPreset" class="btn btn-success" type="button"><i class="bi bi-upload"></i> Ladda upp</button>
+                </div>
+              </div>
+              <div id="presetsList"></div>
+            </div>
           </div>
         </div>
       </div>

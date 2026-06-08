@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional, List, Set, Dict, Any
 from fastapi import FastAPI, HTTPException, Query, Request, Response, Depends, UploadFile, File, Form
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from openpyxl import Workbook, load_workbook
 from pydantic import BaseModel
 
@@ -56,6 +56,15 @@ RFID_AUDIT_FILE = BASE / "rfid_audit.json"
 BLOCKED_RFIDS_FILE = BASE / "blocked_rfids.json"
 API_KEYS_FILE = BASE / "config" / "api_keys.json"
 EXTERNAL_API_AUDIT_LOG = BASE / "external_api_audit.log"
+DISPLAY_PRESETS_FILE = BASE / "config" / "display_presets.json"
+DISPLAY_PRESETS_DIR = BASE / "display_presets"
+
+ALLOWED_IMAGE_TYPES = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+}
+MAX_PRESET_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
 
 # =====================================================================
 # AUDIT LOGGING FOR EXTERNAL API
@@ -168,6 +177,12 @@ def load_rfid_audit() -> List[dict]:
 
 def save_rfid_audit(rows: List[dict]):
     save_json(RFID_AUDIT_FILE, rows)
+
+def load_display_presets() -> dict:
+    return load_json(DISPLAY_PRESETS_FILE, {})
+
+def save_display_presets(d: dict):
+    save_json(DISPLAY_PRESETS_FILE, d)
 
 def normalize_tag(tag: str) -> str:
     return (tag or "").strip().upper()
@@ -2934,6 +2949,114 @@ async def api_my_summary(days: int = 30, session=Depends(require_auth)):
     }
 
 # =====================================================================
+# DISPLAY IMAGE PRESETS
+# =====================================================================
+@app.get("/api/display-presets/images/{filename}")
+async def api_display_preset_image(filename: str):
+    safe_name = Path(filename).name
+    file_path = DISPLAY_PRESETS_DIR / safe_name
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(404, "Image not found")
+    suffix = file_path.suffix.lower()
+    media_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+    media_type = media_types.get(suffix, "application/octet-stream")
+    return FileResponse(file_path, media_type=media_type)
+
+@app.get("/api/display-presets")
+async def api_display_presets_list(session=Depends(require_installer_or_higher)):
+    presets = load_display_presets()
+    result = []
+    for pid, meta in presets.items():
+        result.append({
+            "id": pid,
+            "name": meta.get("name", ""),
+            "filename": meta.get("filename", ""),
+            "image_url": f"/api/display-presets/images/{meta.get('filename', '')}",
+            "content_type": meta.get("content_type", ""),
+            "size_bytes": meta.get("size_bytes", 0),
+            "created_at": meta.get("created_at", ""),
+            "created_by": meta.get("created_by", ""),
+        })
+    return {"ok": True, "presets": result}
+
+@app.post("/api/display-presets")
+async def api_display_presets_upload(
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    session=Depends(require_installer_or_higher),
+):
+    name = (name or "").strip()
+    if not name:
+        raise HTTPException(400, "Preset name is required")
+
+    content_type = (file.content_type or "").lower()
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(400, f"Invalid file type: {content_type}. Allowed: PNG, JPG, WEBP")
+
+    data = await file.read()
+    if len(data) > MAX_PRESET_IMAGE_BYTES:
+        raise HTTPException(413, f"File too large. Max {MAX_PRESET_IMAGE_BYTES // (1024*1024)} MB")
+
+    preset_id = uuid.uuid4().hex[:12]
+    ext = ALLOWED_IMAGE_TYPES[content_type]
+    filename = f"{preset_id}{ext}"
+
+    DISPLAY_PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+    (DISPLAY_PRESETS_DIR / filename).write_bytes(data)
+
+    presets = load_display_presets()
+    presets[preset_id] = {
+        "name": name,
+        "filename": filename,
+        "content_type": content_type,
+        "size_bytes": len(data),
+        "created_at": iso_now(),
+        "created_by": session.get("email", "unknown"),
+    }
+    save_display_presets(presets)
+
+    logger.info("Display preset created: %s (%s) by %s", preset_id, name, session.get("email"))
+    return {
+        "ok": True,
+        "preset": {
+            "id": preset_id,
+            "name": name,
+            "filename": filename,
+            "image_url": f"/api/display-presets/images/{filename}",
+            "created_at": presets[preset_id]["created_at"],
+        },
+    }
+
+@app.patch("/api/display-presets/{preset_id}")
+async def api_display_presets_rename(preset_id: str, payload: dict, session=Depends(require_installer_or_higher)):
+    presets = load_display_presets()
+    if preset_id not in presets:
+        raise HTTPException(404, "Preset not found")
+    new_name = (payload.get("name") or "").strip()
+    if not new_name:
+        raise HTTPException(400, "New name is required")
+    presets[preset_id]["name"] = new_name
+    save_display_presets(presets)
+    logger.info("Display preset renamed: %s -> %s", preset_id, new_name)
+    return {"ok": True}
+
+@app.delete("/api/display-presets/{preset_id}")
+async def api_display_presets_delete(preset_id: str, session=Depends(require_installer_or_higher)):
+    presets = load_display_presets()
+    if preset_id not in presets:
+        raise HTTPException(404, "Preset not found")
+    meta = presets.pop(preset_id)
+    save_display_presets(presets)
+    image_path = DISPLAY_PRESETS_DIR / meta.get("filename", "")
+    if image_path.exists():
+        try:
+            image_path.unlink()
+        except Exception as e:
+            logger.warning("Failed to delete preset image %s: %s", image_path, e)
+    logger.info("Display preset deleted: %s (%s) by %s", preset_id, meta.get("name"), session.get("email"))
+    return {"ok": True}
+
+# =====================================================================
 # HEALTH CHECK
 # =====================================================================
 @app.get("/health")
@@ -2952,6 +3075,10 @@ async def startup():
         save_rfids_map({})
     if not RFID_AUDIT_FILE.exists():
         save_rfid_audit([])
+
+    DISPLAY_PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+    if not DISPLAY_PRESETS_FILE.exists():
+        save_display_presets({})
 
     migrated = migrate_rfids_from_users_if_needed()
     added = 0

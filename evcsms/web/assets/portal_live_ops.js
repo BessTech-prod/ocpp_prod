@@ -6,7 +6,10 @@
     status: '/api/status',
     cpsMap: '/api/cps/map',
     send: '/api/portal/ocpp/command',
-    commandStatus: (id) => `/api/portal/ocpp/command/${encodeURIComponent(id)}`
+    commandStatus: (id) => `/api/portal/ocpp/command/${encodeURIComponent(id)}`,
+    presets: '/api/display-presets',
+    presetDelete: (id) => `/api/display-presets/${encodeURIComponent(id)}`,
+    presetImages: '/api/display-presets/images/'
   };
 
   const $ = (s) => document.querySelector(s);
@@ -18,6 +21,7 @@
     timer: null,
     pendingCommandId: null,
     statusTimer: null,
+    presets: [],
   };
 
   const COMMAND_CONFIG = {
@@ -259,7 +263,10 @@
     toggleField('#idTagWrap', !!cfg.showIdTag);
     toggleField('#configKeyWrap', !!cfg.showConfigKeys);
     toggleField('#displayMessageWrap', !!cfg.showDisplayMessage);
+    toggleField('#managePresetsWrap', !!cfg.showDisplayMessage);
     toggleField('#setVariablesWrap', !!cfg.showSetVariables);
+
+    if (cfg.showDisplayMessage) fetchPresets();
     toggleField('#setVarValueWrap', !!cfg.showSetVarValue);
     toggleField('#getLogWrap', !!cfg.showGetLog);
     toggleField('#updateFirmwareWrap', !!cfg.showUpdateFirmware);
@@ -388,9 +395,16 @@
     } else if (command === 'customer_information') {
        if (idTag) payload.id_token = { idToken: idTag, type: 'ISO14443' };
     } else if (command === 'set_display_message') {
-      const url = ($('#displayMessageUrl')?.value || '').trim();
+      const pick = ($('#presetPick')?.value || '').trim();
+      let url = '';
+      if (pick === '__custom__') {
+        url = ($('#displayMessageUrl')?.value || '').trim();
+      } else if (pick) {
+        const preset = state.presets.find(p => p.id === pick);
+        if (preset) url = window.location.origin + preset.image_url;
+      }
       if (!url) {
-        UI.alert('Ange en bild-URL.');
+        UI.alert('Välj en bildpreset eller ange en bild-URL.');
         return;
       }
       payload.url = url;
@@ -416,6 +430,85 @@
     }
   }
 
+  async function fetchPresets(){
+    try {
+      const res = await UI.getJSON(API.presets);
+      state.presets = res.presets || [];
+    } catch(e){
+      state.presets = [];
+    }
+    renderPresetPick();
+    renderPresetManager();
+  }
+
+  function renderPresetPick(){
+    const sel = $('#presetPick');
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Välj preset...</option>' +
+      state.presets.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('') +
+      '<option value="__custom__">Egen URL...</option>';
+    if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+  }
+
+  function renderPresetManager(){
+    const container = $('#presetsList');
+    if (!container) return;
+    if (!state.presets.length){
+      container.innerHTML = '<p class="text-muted small">Inga bildpresets uppladdade ännu.</p>';
+      return;
+    }
+    container.innerHTML = '<div class="row g-2">' + state.presets.map(p => `
+      <div class="col-6 col-md-3">
+        <div class="card h-100">
+          <img src="${esc(p.image_url)}" class="card-img-top" alt="${esc(p.name)}" style="max-height:120px;object-fit:contain;background:#f8f9fa;">
+          <div class="card-body p-2">
+            <div class="fw-bold small">${esc(p.name)}</div>
+            <div class="text-muted" style="font-size:.7rem">${esc(p.created_by || '')} &middot; ${esc((p.created_at || '').slice(0,10))}</div>
+            <button class="btn btn-sm btn-outline-danger mt-1 btn-delete-preset" data-id="${esc(p.id)}"><i class="bi bi-trash"></i></button>
+          </div>
+        </div>
+      </div>
+    `).join('') + '</div>';
+  }
+
+  async function uploadPreset(){
+    const fileInput = $('#presetFile');
+    const nameInput = $('#presetName');
+    if (!fileInput?.files?.length){ UI.alert('Välj en bildfil.'); return; }
+    const name = (nameInput?.value || '').trim();
+    if (!name){ UI.alert('Ange ett presetnamn.'); return; }
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+    fd.append('name', name);
+    try {
+      const resp = await fetch(API.presets, { method: 'POST', body: fd, credentials: 'same-origin' });
+      if (!resp.ok){
+        const err = await resp.json().catch(()=>({ detail: resp.statusText }));
+        throw new Error(err.detail || resp.statusText);
+      }
+      fileInput.value = '';
+      nameInput.value = '';
+      await fetchPresets();
+    } catch(e){
+      UI.alert('Uppladdning misslyckades: ' + (e.message || e));
+    }
+  }
+
+  async function deletePreset(id){
+    if (!confirm('Ta bort denna bildpreset?')) return;
+    try {
+      const resp = await fetch(API.presetDelete(id), { method: 'DELETE', credentials: 'same-origin' });
+      if (!resp.ok){
+        const err = await resp.json().catch(()=>({ detail: resp.statusText }));
+        throw new Error(err.detail || resp.statusText);
+      }
+      await fetchPresets();
+    } catch(e){
+      UI.alert('Kunde inte ta bort preset: ' + (e.message || e));
+    }
+  }
+
   async function bootstrap(){
     await UI.initPage({ requiredRoles: ['portal_admin','admin'] });
     state.orgs = await UI.getJSON(API.orgs);
@@ -429,6 +522,14 @@
 
     $('#commandPick')?.addEventListener('change', setCommandOptions);
     $('#btnSendCommand')?.addEventListener('click', sendCommand);
+    $('#btnUploadPreset')?.addEventListener('click', uploadPreset);
+    $('#presetPick')?.addEventListener('change', function(){
+      toggleField('#customUrlWrap', this.value === '__custom__');
+    });
+    $('#presetsList')?.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.btn-delete-preset');
+      if (btn) deletePreset(btn.dataset.id);
+    });
 
     setCommandOptions();
 
