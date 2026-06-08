@@ -136,7 +136,7 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
             return call201.UnlockConnector(evse_id=int(payload.get("connector_id", 1)), connector_id=1)
         if command == "set_display_message":
             url = payload.get("url")
-            priority = payload.get("priority", "Normal")
+            priority = payload.get("priority", "NormalCycle")
             msg_id = int(payload.get("id", 1))
             return call201.SetDisplayMessage(
                 message={
