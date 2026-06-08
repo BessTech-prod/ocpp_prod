@@ -645,7 +645,7 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
         priority = str(payload.get("priority", "NormalCycle")).strip()
         if priority not in valid_priorities:
             priority = "NormalCycle"
-        valid_states = {"Idle", "Charging", "Faulted", "Unavailable"}
+        valid_states = {"Idle", "Charging", "Faulted"}
         state_val = str(payload.get("state", "")).strip()
         result = {
             "url": url,
@@ -1255,11 +1255,24 @@ async def api_portal_live_chargers(org_id: Optional[str] = None, session=Depends
 
     items = []
     for cp_id in connected:
+        # Determine OCPP version: prefer Redis metadata, fallback to cps.json
+        ocpp_version = "unknown"
+        try:
+            meta_raw = redis_client.get(f"cp_metadata:{cp_id}")
+            if meta_raw:
+                meta = json.loads(meta_raw.decode())
+                ocpp_version = meta.get("ocpp_version", "unknown")
+        except Exception:
+            pass
+        if ocpp_version == "unknown":
+            ocpp_version = cps_map.get(cp_id, {}).get("ocpp_version", "unknown")
+
         items.append(
             {
                 "cp_id": cp_id,
                 "alias": cps_map.get(cp_id, {}).get("alias") or cp_id,
                 "org_id": cps_map.get(cp_id, {}).get("org_id") or "default",
+                "ocpp_version": ocpp_version,
                 "status": status_data.get(cp_id, {}),
             }
         )

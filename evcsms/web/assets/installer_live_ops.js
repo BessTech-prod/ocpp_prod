@@ -26,60 +26,101 @@
 
   const COMMAND_CONFIG = {
     reset: {
+      label: 'Reset',
+      versions: ['1.6', '2.0.1'],
       argLabel: 'Reset-typ',
-      args: ['Hard', 'Soft'],
+      args16: ['Hard', 'Soft'],
+      args201: ['Immediate', 'OnIdle'],
       showConnector: false,
     },
     change_availability: {
+      label: 'Ändra tillgänglighet',
+      versions: ['1.6'],
       argLabel: 'Tillgänglighet',
       args: ['Operative', 'Inoperative'],
       showConnector: true,
     },
     trigger_message: {
+      label: 'TriggerMessage',
+      versions: ['1.6'],
       argLabel: 'Meddelande',
       args: ['StatusNotification', 'Heartbeat', 'BootNotification', 'MeterValues', 'FirmwareStatusNotification', 'DiagnosticsStatusNotification'],
       showConnector: true,
     },
     clear_cache: {
+      label: 'ClearCache',
+      versions: ['1.6'],
       showConnector: false,
     },
     unlock_connector: {
+      label: 'Lås up uttag',
+      versions: ['1.6', '2.0.1'],
       showConnector: true,
     },
     remote_start_transaction: {
+      label: 'Fjärrstart',
+      versions: ['1.6', '2.0.1'],
       showConnector: true,
       showIdTag: true,
     },
     remote_stop_transaction: {
+      label: 'Fjärrstop',
+      versions: ['1.6', '2.0.1'],
       showConnector: true,
     },
     get_configuration: {
+      label: 'Hämta konfiguration',
+      versions: ['1.6', '2.0.1'],
       showConfigKeys: true,
     },
     set_variables: {
+      label: 'Konfigurera',
+      versions: ['2.0.1'],
       showSetVariables: true,
       showSetVarValue: true,
     },
     set_display_message: {
+      label: 'Visa logotyp',
+      versions: ['2.0.1'],
       showDisplayMessage: true,
     },
     get_base_report: {
+      label: 'Hämta basrapport',
+      versions: ['2.0.1'],
       argLabel: 'Rapport-bas',
       args: ['FullInventory', 'ConfigurationInventory', 'SummaryInventory'],
       showConnector: false,
     },
     get_report: {
-      showSetVariables: true, // Reuse component/variable inputs
+      label: 'Hämta specifik rapport',
+      versions: ['2.0.1'],
+      showSetVariables: true,
       showSetVarValue: false,
     },
     get_log: {
+      label: 'Hämta loggar',
+      versions: ['2.0.1'],
       showGetLog: true,
     },
     update_firmware: {
+      label: 'Uppdatera firmware',
+      versions: ['2.0.1'],
       showUpdateFirmware: true,
     },
     customer_information: {
+      label: 'Kundinformation',
+      versions: ['2.0.1'],
       showIdTag: true,
+    },
+    clear_display_message: {
+      label: 'Rensa displaymeddelande',
+      versions: ['2.0.1'],
+      showConnector: false,
+    },
+    get_transaction_status: {
+      label: 'Transaktionsstatus',
+      versions: ['2.0.1'],
+      showConnector: false,
     },
   };
 
@@ -112,6 +153,7 @@
       cp_id: cpId,
       alias: (cpsMap && cpsMap[cpId] && typeof cpsMap[cpId] === 'object' ? cpsMap[cpId].alias : cpId) || cpId,
       org_id: (cpsMap && cpsMap[cpId] && typeof cpsMap[cpId] === 'object' ? cpsMap[cpId].org_id : cpsMap?.[cpId]) || 'default',
+      ocpp_version: (cpsMap && cpsMap[cpId] && typeof cpsMap[cpId] === 'object' ? cpsMap[cpId].ocpp_version : null) || 'unknown',
       status: (statusMap && statusMap[cpId]) || {},
     }));
 
@@ -205,7 +247,10 @@
     const sel = $('#cpPick');
     if (!sel) return;
     const current = sel.value;
-    sel.innerHTML = state.items.map((it)=>`<option value="${esc(it.cp_id)}">${esc(it.alias || it.cp_id)} (${esc(it.cp_id)})</option>`).join('');
+    sel.innerHTML = state.items.map((it)=>{
+      const ver = it.ocpp_version && it.ocpp_version !== 'unknown' ? ` [${it.ocpp_version}]` : '';
+      return `<option value="${esc(it.cp_id)}">${esc(it.alias || it.cp_id)} (${esc(it.cp_id)})${esc(ver)}</option>`;
+    }).join('');
     if (!state.items.length){
       sel.innerHTML = '<option value="">Ingen laddare tillgänglig</option>';
       sel.disabled = true;
@@ -213,6 +258,7 @@
     }
     sel.disabled = false;
     if (current && state.items.some((it)=>it.cp_id === current)) sel.value = current;
+    buildCommandDropdown();
   }
 
   function findCp(cpId){
@@ -245,20 +291,62 @@
     el.classList.toggle('d-none', !visible);
   }
 
+  function getSelectedCpVersion(){
+    const cpId = ($('#cpPick')?.value || '').trim();
+    if (!cpId) return 'unknown';
+    const item = state.items.find(it => it.cp_id === cpId);
+    return item?.ocpp_version || 'unknown';
+  }
+
+  function buildCommandDropdown(){
+    const sel = $('#commandPick');
+    if (!sel) return;
+    const version = getSelectedCpVersion();
+    const current = sel.value;
+    sel.innerHTML = '';
+
+    for (const [cmd, cfg] of Object.entries(COMMAND_CONFIG)){
+      if (version === 'unknown' || cfg.versions.includes(version)){
+        const opt = document.createElement('option');
+        opt.value = cmd;
+        opt.textContent = cfg.label || cmd;
+        sel.appendChild(opt);
+      }
+    }
+
+    if (!sel.options.length){
+      sel.innerHTML = '<option value="">Inga kommandon tillgängliga</option>';
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
+    setCommandOptions();
+  }
+
   function setCommandOptions(){
-    const command = ($('#commandPick')?.value || 'reset');
+    const command = ($('#commandPick')?.value || '');
+    if (!command) return;
     const cfg = COMMAND_CONFIG[command] || {};
+    const version = getSelectedCpVersion();
     const arg = $('#commandArg');
     const argLabel = $('label[for="commandArg"]');
-    if (arg && cfg.args?.length){
-      arg.innerHTML = cfg.args.map((v)=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+
+    // Resolve version-specific args for commands like reset
+    let args = cfg.args || null;
+    if (version === '1.6' && cfg.args16) args = cfg.args16;
+    else if (version === '2.0.1' && cfg.args201) args = cfg.args201;
+    else if (cfg.args16 && cfg.args201) args = cfg.args16.concat(cfg.args201); // unknown version: show all
+
+    if (arg && args?.length){
+      arg.innerHTML = args.map((v)=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
     } else if (arg) {
       arg.innerHTML = '';
     }
 
     if (argLabel) argLabel.textContent = cfg.argLabel || 'Parameter';
 
-    toggleField('#commandArgWrap', !!cfg.args?.length);
+    toggleField('#commandArgWrap', !!args?.length);
     toggleField('#connectorWrap', !!cfg.showConnector);
     toggleField('#idTagWrap', !!cfg.showIdTag);
     toggleField('#configKeyWrap', !!cfg.showConfigKeys);
@@ -523,6 +611,7 @@
       orgFilter.addEventListener('change', fetchLive);
     }
 
+    $('#cpPick')?.addEventListener('change', buildCommandDropdown);
     $('#commandPick')?.addEventListener('change', setCommandOptions);
     $('#btnSendCommand')?.addEventListener('click', sendCommand);
     $('#btnUploadPreset')?.addEventListener('click', uploadPreset);
@@ -534,7 +623,7 @@
       if (btn) deletePreset(btn.dataset.id);
     });
 
-    setCommandOptions();
+    buildCommandDropdown();
 
     // Start the timer first so the page keeps polling even if the first request fails
     state.timer = setInterval(fetchLive, POLL_MS);

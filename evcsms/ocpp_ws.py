@@ -56,11 +56,16 @@ except ImportError:
 
 # Helper to get enum members that might be lowercase or uppercase
 def get_enum_member(cls, name):
-    for attr in [name.lower(), name.capitalize(), name.upper()]:
+    # Try attribute name lookups
+    for attr in [name, name.lower(), name.capitalize(), name.upper()]:
         if hasattr(cls, attr):
             return getattr(cls, attr)
-    # If no member found, return capitalized name as string (OCPP spec style)
-    return name.capitalize()
+    # Try matching by enum value (e.g. "AlwaysFront" matches member always_front with value "AlwaysFront")
+    for member in cls:
+        if member.value == name or member.value.lower() == name.lower():
+            return member
+    # If no member found, return original name as-is (preserves CamelCase like AlwaysFront)
+    return name
 
 from app.auth_store import AuthStore
 from app.history_export import enrich_transaction_snapshot
