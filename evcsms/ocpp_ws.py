@@ -95,6 +95,7 @@ CPS_FILE = BASE / "config" / "cps.json"
 TRANSACTIONS_FILE = BASE / "transactions.json"
 RFIDS_FILE = BASE / "config" / "rfids.json"
 BLOCKED_RFIDS_FILE = BASE / "blocked_rfids.json"
+DIAGNOSTICS_META_FILE = BASE / "config" / "diagnostics.json"
 
 # =====================================================================
 # REDIS CLIENT
@@ -311,6 +312,19 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
         if isinstance(keys, str):
             keys = [k.strip() for k in keys.split(",") if k.strip()]
         return call.GetConfiguration(key=[str(k) for k in keys])
+
+    if command == "get_diagnostics":
+        location = str(payload.get("location", ""))
+        kwargs = {"location": location}
+        if payload.get("start_time"):
+            kwargs["start_time"] = str(payload["start_time"])
+        if payload.get("stop_time"):
+            kwargs["stop_time"] = str(payload["stop_time"])
+        if payload.get("retries") is not None:
+            kwargs["retries"] = int(payload["retries"])
+        if payload.get("retry_interval") is not None:
+            kwargs["retry_interval"] = int(payload["retry_interval"])
+        return call.GetDiagnostics(**kwargs)
 
     raise ValueError(f"Unsupported command: {command}")
 
@@ -811,6 +825,23 @@ class CentralSystemCP(CP):
     @on(Action.diagnostics_status_notification)
     async def on_diagnostics_status_notification(self, status, **kwargs):
         logger.info("[%s] DiagnosticsStatusNotification status=%s", self.id, status)
+        try:
+            diags = load_json(DIAGNOSTICS_META_FILE, {})
+            for token, entry in diags.items():
+                if entry.get("cp_id") == self.id and entry.get("status") in ("Pending", "Uploading"):
+                    status_str = str(status)
+                    if status_str in ("Uploading",):
+                        entry["status"] = "Uploading"
+                    elif status_str in ("Uploaded",):
+                        entry["status"] = "Uploaded"
+                    elif status_str in ("UploadFailed",):
+                        entry["status"] = "UploadFailure"
+                    elif status_str in ("Idle",):
+                        pass
+                    save_json(DIAGNOSTICS_META_FILE, diags)
+                    break
+        except Exception as e:
+            logger.warning("[%s] Failed to update diagnostics metadata: %s", self.id, e)
         return call_result.DiagnosticsStatusNotification()
 
     @on(Action.firmware_status_notification)
@@ -952,6 +983,21 @@ class CentralSystemCP201(CP201):
     @on(Action201.log_status_notification)
     async def on_log_status_notification(self, status, **kwargs):
         logger.info("[%s] LogStatusNotification (v2.0.1) status=%s", self.id, status)
+        try:
+            diags = load_json(DIAGNOSTICS_META_FILE, {})
+            for token, entry in diags.items():
+                if entry.get("cp_id") == self.id and entry.get("status") in ("Pending", "Uploading"):
+                    status_str = str(make_json_safe(status))
+                    if status_str in ("Uploading",):
+                        entry["status"] = "Uploading"
+                    elif status_str in ("Uploaded",):
+                        entry["status"] = "Uploaded"
+                    elif status_str in ("UploadFailure",):
+                        entry["status"] = "UploadFailure"
+                    save_json(DIAGNOSTICS_META_FILE, diags)
+                    break
+        except Exception as e:
+            logger.warning("[%s] Failed to update diagnostics metadata: %s", self.id, e)
         return call_result201.LogStatusNotification()
 
     @on(Action201.transaction_event)

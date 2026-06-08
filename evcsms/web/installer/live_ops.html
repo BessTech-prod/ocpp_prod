@@ -53,6 +53,9 @@
                data-route-org="/org/history.html"
                data-route-user="/user/index.html"><i class="bi bi-clock-history"></i> Historik</a>
           </li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin,installer">
+            <a class="nav-link" href="/installer/diagnostics.html"><i class="bi bi-file-earmark-medical"></i> Diagnostik</a>
+          </li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,user,installer">
             <a href="#" class="nav-link"
                data-route-portal="/my.html"
@@ -192,16 +195,28 @@
                   </div>
                   <div class="col-12 d-none" id="getLogWrap">
                     <div class="row g-2">
-                      <div class="col-12 col-md-6">
-                        <label for="getLogUrl" class="form-label">Log-destination (URL)</label>
-                        <input id="getLogUrl" type="text" class="form-control" placeholder="ftp://user:pass@host/path">
+                      <div class="col-12 col-md-4">
+                        <label for="getLogUrl" class="form-label">Upload-URL</label>
+                        <input id="getLogUrl" type="text" class="form-control" readonly placeholder="Genereras automatiskt...">
+                        <div class="form-check mt-1">
+                          <input class="form-check-input" type="checkbox" id="getLogManualUrl">
+                          <label class="form-check-label small" for="getLogManualUrl">Ange manuell URL (t.ex. FTP)</label>
+                        </div>
                       </div>
-                      <div class="col-12 col-md-6">
+                      <div class="col-12 col-md-3">
                         <label for="getLogType" class="form-label">Log-typ</label>
                         <select id="getLogType" class="form-select">
                           <option value="DiagnosticsLog">DiagnosticsLog</option>
                           <option value="SecurityLog">SecurityLog</option>
                         </select>
+                      </div>
+                      <div class="col-12 col-md-2">
+                        <label for="getLogStartTime" class="form-label">Från (valfritt)</label>
+                        <input id="getLogStartTime" type="datetime-local" class="form-control">
+                      </div>
+                      <div class="col-12 col-md-2">
+                        <label for="getLogStopTime" class="form-label">Till (valfritt)</label>
+                        <input id="getLogStopTime" type="datetime-local" class="form-control">
                       </div>
                     </div>
                   </div>

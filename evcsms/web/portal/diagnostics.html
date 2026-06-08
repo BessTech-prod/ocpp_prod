@@ -3,9 +3,8 @@
 <head>
   <link rel="icon" type="image/png" href="/assets/transvit23.png">
   <meta charset="utf-8" />
-  <title>TakoramaCharge – Laddare</title>
+  <title>TakoramaCharge – Diagnostik</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/assets/style.css">
@@ -21,8 +20,8 @@
       <div id="navMain" class="collapse navbar-collapse justify-content-end">
         <ul class="navbar-nav align-items-center gap-2">
           <li class="nav-item"><a class="nav-link js-go-dashboard" href="javascript:void(0)"><i class="bi bi-speedometer2"></i> Överblick</a></li>
-          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/installer/live_ops.html"><i class="bi bi-broadcast-pin"></i> Live driftpanel</a></li>
-          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/installer/cps.html"><i class="bi bi-diagram-3"></i> Laddare</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/portal/live_ops.html"><i class="bi bi-broadcast-pin"></i> Live driftpanel</a></li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/portal/cps.html"><i class="bi bi-diagram-3"></i> Laddare</a></li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/instructions.html"><i class="bi bi-info-circle"></i> Instruktioner</a></li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,installer">
             <a href="#" class="nav-link"
@@ -30,8 +29,6 @@
                data-route-org="/org/rfid.html"
                data-route-user="/user/index.html"><i class="bi bi-upc-scan"></i> RFID</a>
           </li>
-
-          <!-- ROLL‑MEDVETNA LÄNKAR (gemensamma sidor) -->
           <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,installer">
             <a href="#" class="nav-link"
                data-route-portal="/portal/add_user.html"
@@ -39,14 +36,10 @@
                data-route-user="/user/index.html"><i class="bi bi-person-plus"></i> Användare</a>
           </li>
           <li class="nav-item" data-visible-roles="portal_admin,admin">
-            <a class="nav-link" href="/orgs.html">
-              <i class="bi bi-building-gear"></i> Organisationer
-            </a>
+            <a class="nav-link" href="/orgs.html"><i class="bi bi-building-gear"></i> Organisationer</a>
           </li>
           <li class="nav-item" data-visible-roles="portal_admin,admin">
-            <a class="nav-link" href="/portal/api_keys.html">
-              <i class="bi bi-code-square"></i> Integrations
-            </a>
+            <a class="nav-link" href="/portal/api_keys.html"><i class="bi bi-code-square"></i> Integrations</a>
           </li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin">
             <a href="#" class="nav-link"
@@ -55,7 +48,7 @@
                data-route-user="/user/index.html"><i class="bi bi-clock-history"></i> Historik</a>
           </li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,installer">
-            <a class="nav-link" href="/installer/diagnostics.html"><i class="bi bi-file-earmark-medical"></i> Diagnostik</a>
+            <a class="nav-link" href="/portal/diagnostics.html"><i class="bi bi-file-earmark-medical"></i> Diagnostik</a>
           </li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,user,installer">
             <a href="#" class="nav-link"
@@ -63,7 +56,6 @@
                data-route-org="/org/my.html"
                data-route-user="/user/my.html"><i class="bi bi-person-badge"></i> Min statistik</a>
           </li>
-
           <li class="nav-item"><span id="me-display" class="navbar-text small opacity-75"></span></li>
           <li class="nav-item"><button id="btnLogout" class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-box-arrow-right"></i> Logga ut</button></li>
         </ul>
@@ -75,54 +67,24 @@
     <div id="page-alerts"></div>
     <div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
 
-    <section class="page-header">
+    <div class="page-header mb-3">
       <div>
-        <h1 class="h4 m-0">Administrera Laddare</h1>
-        <p class="page-subtitle">Koppla ny anslutna laddare till rätt organisation och administrera befintliga.</p>
-      </div>
-    </section>
-
-    <div class="row g-3 align-items-baseline mb-3 toolbar-panel">
-      <input type="hidden" id="editingCp" value="">
-      <div class="col-12 col-md-4">
-        <label for="cpPick" class="form-label mb-1">Välj Laddare (ID)</label>
-        <select id="cpPick" class="form-select"></select>
-        <div class="form-text"></div>
-      </div>
-      <div class="col-12 col-md-3">
-        <label for="cpAlias" class="form-label mb-1">Laddar-alias</label>
-        <input id="cpAlias" class="form-control" placeholder="Ex: Garage Nord" />
-      </div>
-      <div class="col-12 col-md-3">
-        <label for="orgPick" class="form-label mb-1">Organisation</label>
-        <select id="orgPick" class="form-select"></select>
-      </div>
-      <div class="col-12 col-md-2 d-grid align-self-end">
-        <button id="btnAssign" class="btn btn-primary" type="button"><i class="bi bi-link-45deg"></i> <span id="btnAssignLabel">Tilldela</span></button>
-      </div>
-      <div class="col-12 col-md-2 d-grid align-self-end">
-        <button id="btnCancel" class="btn btn-outline-secondary d-none" type="button"><i class="bi bi-x-circle"></i> <span>Avbryt</span></button>
+        <h1 class="h4 m-0">Diagnostikfiler</h1>
+        <p class="page-subtitle">Bläddra, ladda ner och hantera diagnostikfiler som laddats upp från laddare.</p>
       </div>
     </div>
 
-    <div class="row g-3 align-items-center mb-3">
+    <div class="row g-3 mb-4">
       <div class="col-12 col-md-4">
-        <div class="input-group input-group-sm">
-          <label class="input-group-text" for="tableFilterOrg"><i class="bi bi-filter"></i> Filtrera org</label>
-          <select id="tableFilterOrg" class="form-select">
-            <option value="">Alla organisationer</option>
-            <option value="__unassigned__">Nya laddare</option>
-          </select>
-        </div>
+        <label for="orgFilter" class="form-label">Organisation</label>
+        <select id="orgFilter" class="form-select">
+          <option value="">Alla organisationer</option>
+        </select>
       </div>
     </div>
 
-    <h2 class="h5 mb-3 fw-bold">Alla laddare</h2>
-    <div class="table-responsive shadow-sm border rounded-3 bg-white">
-      <table class="table table-hover align-middle mb-0" id="cps-table">
-        <thead class="bg-light"><tr><th>Alias</th><th>Laddare‑ID</th><th>Organisation</th><th class="text-end" style="width:260px;">Åtgärder</th></tr></thead>
-        <tbody></tbody>
-      </table>
+    <div id="diagContainer">
+      <p class="text-muted" id="diagEmpty">Laddar diagnostikfiler...</p>
     </div>
 
     <div class="back-link-wrap">
@@ -132,9 +94,8 @@
 
   <footer class="text-center text-muted small py-3"></footer>
 
-  <!-- JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/assets/ui-common.js"></script>
-  <script src="/assets/installer_cps.js?v=2"></script>
+  <script src="/assets/portal_diagnostics.js?v=1"></script>
 </body>
 </html>

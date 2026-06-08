@@ -9,7 +9,8 @@
     commandStatus: (id) => `/api/portal/ocpp/command/${encodeURIComponent(id)}`,
     presets: '/api/display-presets',
     presetDelete: (id) => `/api/display-presets/${encodeURIComponent(id)}`,
-    presetImages: '/api/display-presets/images/'
+    presetImages: '/api/display-presets/images/',
+    diagRequest: '/api/diagnostics/request',
   };
 
   const $ = (s) => document.querySelector(s);
@@ -98,8 +99,13 @@
       showSetVarValue: false,
     },
     get_log: {
-      label: 'Hämta loggar',
+      label: 'Hämta loggar (2.0.1)',
       versions: ['2.0.1'],
+      showGetLog: true,
+    },
+    get_diagnostics: {
+      label: 'Hämta diagnostik (1.6)',
+      versions: ['1.6'],
       showGetLog: true,
     },
     update_firmware: {
@@ -470,10 +476,38 @@
     } else if (command === 'get_base_report') {
        payload.report_base = arg || 'FullInventory';
     } else if (command === 'get_log') {
-       const url = ($('#getLogUrl')?.value || '').trim();
+       let url = ($('#getLogUrl')?.value || '').trim();
+       const isManual = $('#getLogManualUrl')?.checked;
+       if (!isManual) {
+         try {
+           const tokenRes = await UI.postJSON(API.diagRequest, { cp_id: cpId, log_type: $('#getLogType')?.value || 'DiagnosticsLog' });
+           url = window.location.origin + tokenRes.upload_url;
+           $('#getLogUrl').value = url;
+         } catch(e) { UI.alert('Kunde inte skapa upload-token: ' + (e.message || e)); return; }
+       }
        if (!url) { UI.alert('Ange en URL för log-uppladdning.'); return; }
        payload.remote_location = url;
        payload.log_type = $('#getLogType')?.value || 'DiagnosticsLog';
+       const startTime = ($('#getLogStartTime')?.value || '').trim();
+       const stopTime = ($('#getLogStopTime')?.value || '').trim();
+       if (startTime) payload.oldest_timestamp = new Date(startTime).toISOString();
+       if (stopTime) payload.latest_timestamp = new Date(stopTime).toISOString();
+    } else if (command === 'get_diagnostics') {
+       let url = ($('#getLogUrl')?.value || '').trim();
+       const isManual = $('#getLogManualUrl')?.checked;
+       if (!isManual) {
+         try {
+           const tokenRes = await UI.postJSON(API.diagRequest, { cp_id: cpId, log_type: 'DiagnosticsLog' });
+           url = window.location.origin + tokenRes.upload_url;
+           $('#getLogUrl').value = url;
+         } catch(e) { UI.alert('Kunde inte skapa upload-token: ' + (e.message || e)); return; }
+       }
+       if (!url) { UI.alert('Ange en URL för diagnostik-uppladdning.'); return; }
+       payload.location = url;
+       const startTime = ($('#getLogStartTime')?.value || '').trim();
+       const stopTime = ($('#getLogStopTime')?.value || '').trim();
+       if (startTime) payload.start_time = new Date(startTime).toISOString();
+       if (stopTime) payload.stop_time = new Date(stopTime).toISOString();
     } else if (command === 'update_firmware') {
        const loc = ($('#fwLocation')?.value || '').trim();
        const date = ($('#fwRetrieveDate')?.value || '').trim();
@@ -615,6 +649,14 @@
     $('#commandPick')?.addEventListener('change', setCommandOptions);
     $('#btnSendCommand')?.addEventListener('click', sendCommand);
     $('#btnUploadPreset')?.addEventListener('click', uploadPreset);
+    $('#getLogManualUrl')?.addEventListener('change', function(){
+      const urlInput = $('#getLogUrl');
+      if (urlInput) {
+        urlInput.readOnly = !this.checked;
+        if (!this.checked) { urlInput.value = ''; urlInput.placeholder = 'Genereras automatiskt...'; }
+        else { urlInput.placeholder = 'ftp://user:pass@host/path'; }
+      }
+    });
     $('#presetPick')?.addEventListener('change', function(){
       toggleField('#customUrlWrap', this.value === '__custom__');
     });

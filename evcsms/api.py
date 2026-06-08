@@ -58,6 +58,8 @@ API_KEYS_FILE = BASE / "config" / "api_keys.json"
 EXTERNAL_API_AUDIT_LOG = BASE / "external_api_audit.log"
 DISPLAY_PRESETS_FILE = BASE / "config" / "display_presets.json"
 DISPLAY_PRESETS_DIR = BASE / "display_presets"
+DIAGNOSTICS_META_FILE = BASE / "config" / "diagnostics.json"
+DIAGNOSTICS_DIR = BASE / "diagnostics"
 
 ALLOWED_IMAGE_TYPES = {
     "image/png": ".png",
@@ -65,6 +67,8 @@ ALLOWED_IMAGE_TYPES = {
     "image/webp": ".webp",
 }
 MAX_PRESET_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+MAX_DIAG_FILE_BYTES = 50 * 1024 * 1024  # 50 MB
+DIAG_TOKEN_EXPIRY_HOURS = 2
 
 # =====================================================================
 # AUDIT LOGGING FOR EXTERNAL API
@@ -183,6 +187,12 @@ def load_display_presets() -> dict:
 
 def save_display_presets(d: dict):
     save_json(DISPLAY_PRESETS_FILE, d)
+
+def load_diagnostics() -> dict:
+    return load_json(DIAGNOSTICS_META_FILE, {})
+
+def save_diagnostics(d: dict):
+    save_json(DIAGNOSTICS_META_FILE, d)
 
 def normalize_tag(tag: str) -> str:
     return (tag or "").strip().upper()
@@ -714,6 +724,18 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
             "report": bool(payload.get("report", True)),
             "clear": bool(payload.get("clear", False)),
             "request_id": payload.get("request_id")
+        }
+
+    if command == "get_diagnostics":
+        loc = (payload.get("location") or "").strip()
+        if not loc:
+            raise HTTPException(400, "location krävs för get_diagnostics")
+        return {
+            "location": loc,
+            "start_time": payload.get("start_time"),
+            "stop_time": payload.get("stop_time"),
+            "retries": payload.get("retries"),
+            "retry_interval": payload.get("retry_interval"),
         }
 
     raise HTTPException(400, f"Ogiltigt command: {command}")
@@ -3079,6 +3101,151 @@ async def api_display_presets_delete(preset_id: str, session=Depends(require_ins
     return {"ok": True}
 
 # =====================================================================
+# CHARGER DIAGNOSTICS
+# =====================================================================
+@app.post("/api/diagnostics/request")
+async def api_diagnostics_request(payload: dict, session=Depends(require_installer_or_higher)):
+    cp_id = (payload.get("cp_id") or "").strip()
+    if not cp_id:
+        raise HTTPException(400, "cp_id is required")
+    log_type = (payload.get("log_type") or "DiagnosticsLog").strip()
+    token = f"diag-{uuid.uuid4().hex}"
+    diags = load_diagnostics()
+    diags[token] = {
+        "cp_id": cp_id,
+        "log_type": log_type,
+        "status": "Pending",
+        "filename": None,
+        "original_filename": None,
+        "size_bytes": 0,
+        "content_type": None,
+        "requested_at": iso_now(),
+        "requested_by": session.get("email", "unknown"),
+        "uploaded_at": None,
+    }
+    save_diagnostics(diags)
+    upload_url = f"/api/diagnostics/upload/{token}"
+    logger.info("Diagnostics token created: %s for cp_id=%s by %s", token, cp_id, session.get("email"))
+    return {"ok": True, "token": token, "upload_url": upload_url}
+
+async def _handle_diagnostics_upload(token: str, request: Request):
+    diags = load_diagnostics()
+    if token not in diags:
+        raise HTTPException(404, "Unknown upload token")
+    entry = diags[token]
+    requested_at = entry.get("requested_at", "")
+    if requested_at:
+        try:
+            req_dt = datetime.fromisoformat(requested_at.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) - req_dt > timedelta(hours=DIAG_TOKEN_EXPIRY_HOURS):
+                raise HTTPException(410, "Upload token has expired")
+        except (ValueError, TypeError):
+            pass
+    body = await request.body()
+    if len(body) > MAX_DIAG_FILE_BYTES:
+        raise HTTPException(413, f"File too large. Max {MAX_DIAG_FILE_BYTES // (1024*1024)} MB")
+    if not body:
+        raise HTTPException(400, "Empty upload body")
+    ct = request.headers.get("content-type", "application/octet-stream")
+    cp_id = entry.get("cp_id", "unknown")
+    cp_dir = DIAGNOSTICS_DIR / cp_id
+    cp_dir.mkdir(parents=True, exist_ok=True)
+    ts_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    ext = ".bin"
+    if "zip" in ct:
+        ext = ".zip"
+    elif "gzip" in ct or "gz" in ct:
+        ext = ".tar.gz"
+    elif "text" in ct:
+        ext = ".txt"
+    elif "xml" in ct:
+        ext = ".xml"
+    filename = f"{cp_id}_{ts_str}_diag{ext}"
+    (cp_dir / filename).write_bytes(body)
+    entry["status"] = "Uploaded"
+    entry["filename"] = filename
+    entry["original_filename"] = filename
+    entry["size_bytes"] = len(body)
+    entry["content_type"] = ct
+    entry["uploaded_at"] = iso_now()
+    save_diagnostics(diags)
+    logger.info("Diagnostics file uploaded: %s (%d bytes) for cp_id=%s", filename, len(body), cp_id)
+    return {"ok": True, "filename": filename}
+
+@app.put("/api/diagnostics/upload/{token}")
+async def api_diagnostics_upload_put(token: str, request: Request):
+    return await _handle_diagnostics_upload(token, request)
+
+@app.post("/api/diagnostics/upload/{token}")
+async def api_diagnostics_upload_post(token: str, request: Request):
+    return await _handle_diagnostics_upload(token, request)
+
+@app.get("/api/diagnostics")
+async def api_diagnostics_list(session=Depends(require_installer_or_higher)):
+    diags = load_diagnostics()
+    cps = load_cps_map()
+    orgs = load_orgs()
+    result = []
+    for diag_id, meta in diags.items():
+        cp_id = meta.get("cp_id", "")
+        cp_entry = cps.get(cp_id, {})
+        if isinstance(cp_entry, str):
+            cp_entry = {}
+        org_id = cp_entry.get("org_id", "default")
+        org_name = orgs.get(org_id, {}).get("name", org_id)
+        alias = cp_entry.get("alias", cp_id) or cp_id
+        result.append({
+            "id": diag_id,
+            "cp_id": cp_id,
+            "alias": alias,
+            "org_id": org_id,
+            "org_name": org_name,
+            "log_type": meta.get("log_type", ""),
+            "status": meta.get("status", ""),
+            "filename": meta.get("filename", ""),
+            "size_bytes": meta.get("size_bytes", 0),
+            "requested_at": meta.get("requested_at", ""),
+            "uploaded_at": meta.get("uploaded_at", ""),
+            "requested_by": meta.get("requested_by", ""),
+        })
+    return {"ok": True, "diagnostics": result}
+
+@app.get("/api/diagnostics/{diag_id}/download")
+async def api_diagnostics_download(diag_id: str, session=Depends(require_installer_or_higher)):
+    diags = load_diagnostics()
+    if diag_id not in diags:
+        raise HTTPException(404, "Diagnostic entry not found")
+    meta = diags[diag_id]
+    filename = meta.get("filename")
+    if not filename:
+        raise HTTPException(404, "No file uploaded for this entry")
+    cp_id = meta.get("cp_id", "unknown")
+    file_path = DIAGNOSTICS_DIR / cp_id / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(404, "Diagnostic file not found on disk")
+    media_type = meta.get("content_type", "application/octet-stream")
+    return FileResponse(file_path, media_type=media_type, filename=filename)
+
+@app.delete("/api/diagnostics/{diag_id}")
+async def api_diagnostics_delete(diag_id: str, session=Depends(require_installer_or_higher)):
+    diags = load_diagnostics()
+    if diag_id not in diags:
+        raise HTTPException(404, "Diagnostic entry not found")
+    meta = diags.pop(diag_id)
+    save_diagnostics(diags)
+    filename = meta.get("filename")
+    if filename:
+        cp_id = meta.get("cp_id", "unknown")
+        file_path = DIAGNOSTICS_DIR / cp_id / filename
+        if file_path.exists():
+            try:
+                file_path.unlink()
+            except Exception as e:
+                logger.warning("Failed to delete diagnostic file %s: %s", file_path, e)
+    logger.info("Diagnostic entry deleted: %s (cp_id=%s) by %s", diag_id, meta.get("cp_id"), session.get("email"))
+    return {"ok": True}
+
+# =====================================================================
 # HEALTH CHECK
 # =====================================================================
 @app.get("/health")
@@ -3101,6 +3268,10 @@ async def startup():
     DISPLAY_PRESETS_DIR.mkdir(parents=True, exist_ok=True)
     if not DISPLAY_PRESETS_FILE.exists():
         save_display_presets({})
+
+    DIAGNOSTICS_DIR.mkdir(parents=True, exist_ok=True)
+    if not DIAGNOSTICS_META_FILE.exists():
+        save_diagnostics({})
 
     migrated = migrate_rfids_from_users_if_needed()
     added = 0
