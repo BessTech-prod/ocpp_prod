@@ -232,6 +232,67 @@
                       </div>
                     </div>
                   </div>
+                  <!-- Plug & Charge: Certificate PEM -->
+                  <div class="col-12 d-none" id="certPemWrap">
+                    <label for="certPemInput" class="form-label">Certifikat (PEM)</label>
+                    <textarea id="certPemInput" class="form-control font-monospace" rows="6" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"></textarea>
+                  </div>
+                  <!-- Plug & Charge: Certificate type (install) -->
+                  <div class="col-12 col-md-4 d-none" id="certTypeWrap">
+                    <label for="certTypeSelect" class="form-label">Certifikattyp</label>
+                    <select id="certTypeSelect" class="form-select">
+                      <option value="V2GRootCertificate">V2G Root</option>
+                      <option value="MORootCertificate">MO Root</option>
+                      <option value="CSMSRootCertificate">CSMS Root</option>
+                      <option value="ManufacturerRootCertificate">Manufacturer Root</option>
+                    </select>
+                  </div>
+                  <!-- Plug & Charge: Certificate type filter (list) -->
+                  <div class="col-12 col-md-4 d-none" id="certTypeFilterWrap">
+                    <label for="certTypeFilterSelect" class="form-label">Filtrera certifikattyp (valfritt)</label>
+                    <select id="certTypeFilterSelect" class="form-select">
+                      <option value="">Alla typer</option>
+                      <option value="V2GRootCertificate">V2G Root</option>
+                      <option value="MORootCertificate">MO Root</option>
+                      <option value="CSMSRootCertificate">CSMS Root</option>
+                      <option value="V2GCertificateChain">V2G Certificate Chain</option>
+                      <option value="ManufacturerRootCertificate">Manufacturer Root</option>
+                    </select>
+                  </div>
+                  <!-- Plug & Charge: Certificate hash fields (delete) -->
+                  <div class="col-12 d-none" id="certHashWrap">
+                    <div class="row g-2">
+                      <div class="col-12 col-md-3">
+                        <label for="certHashAlgo" class="form-label">Hash-algoritm</label>
+                        <select id="certHashAlgo" class="form-select">
+                          <option value="SHA256">SHA256</option>
+                          <option value="SHA384">SHA384</option>
+                          <option value="SHA512">SHA512</option>
+                        </select>
+                      </div>
+                      <div class="col-12 col-md-3">
+                        <label for="certIssuerNameHash" class="form-label">Issuer Name Hash</label>
+                        <input id="certIssuerNameHash" type="text" class="form-control" placeholder="Hex-kodad hash">
+                      </div>
+                      <div class="col-12 col-md-3">
+                        <label for="certIssuerKeyHash" class="form-label">Issuer Key Hash</label>
+                        <input id="certIssuerKeyHash" type="text" class="form-control" placeholder="Hex-kodad hash">
+                      </div>
+                      <div class="col-12 col-md-3">
+                        <label for="certSerialNumber" class="form-label">Serienummer</label>
+                        <input id="certSerialNumber" type="text" class="form-control" placeholder="Certifikatets serienummer">
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Plug & Charge: Certificate signed type -->
+                  <div class="col-12 col-md-4 d-none" id="certSignedTypeWrap">
+                    <label for="certSignedTypeSelect" class="form-label">Certifikattyp (valfritt)</label>
+                    <select id="certSignedTypeSelect" class="form-select">
+                      <option value="">Ej specificerad</option>
+                      <option value="ChargingStationCertificate">Charging Station Certificate</option>
+                      <option value="V2GCertificate">V2G Certificate</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>

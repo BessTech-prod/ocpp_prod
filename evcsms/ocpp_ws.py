@@ -33,6 +33,10 @@ try:
         MessagePriorityEnumType as MessagePriority201,
         MessageFormatEnumType as MessageFormat201,
         MessageStateEnumType as MessageState201,
+        GenericStatusEnumType,
+        AuthorizeCertificateStatusEnumType,
+        Iso15118EVCertificateStatusEnumType,
+        GetCertificateStatusEnumType,
     )
 except ImportError:
     try:
@@ -43,6 +47,10 @@ except ImportError:
             MessagePriorityType as MessagePriority201,
             MessageFormatType as MessageFormat201,
             MessageStateType as MessageState201,
+            GenericStatusEnumType,
+            AuthorizeCertificateStatusEnumType,
+            Iso15118EVCertificateStatusEnumType,
+            GetCertificateStatusEnumType,
         )
     except ImportError:
         from ocpp.v201.enums import (
@@ -52,6 +60,10 @@ except ImportError:
             MessagePriority as MessagePriority201,
             MessageFormat as MessageFormat201,
             MessageState as MessageState201,
+            GenericStatusEnumType,
+            AuthorizeCertificateStatusEnumType,
+            Iso15118EVCertificateStatusEnumType,
+            GetCertificateStatusEnumType,
         )
 
 # Helper to get enum members that might be lowercase or uppercase
@@ -96,6 +108,7 @@ TRANSACTIONS_FILE = BASE / "transactions.json"
 RFIDS_FILE = BASE / "config" / "rfids.json"
 BLOCKED_RFIDS_FILE = BASE / "blocked_rfids.json"
 DIAGNOSTICS_META_FILE = BASE / "config" / "diagnostics.json"
+PNC_FILE = BASE / "config" / "pnc.json"
 
 # =====================================================================
 # REDIS CLIENT
@@ -285,6 +298,37 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
 
         if command == "clear_cache":
             return call201.ClearCache()
+
+        # ── Plug & Charge certificate commands ──────────────────────────
+        if command == "install_certificate":
+            return call201.InstallCertificate(
+                certificate_type=payload.get("certificate_type"),
+                certificate=payload.get("certificate"),
+            )
+
+        if command == "delete_certificate":
+            return call201.DeleteCertificate(
+                certificate_hash_data={
+                    "hash_algorithm": payload.get("hash_algorithm"),
+                    "issuer_name_hash": payload.get("issuer_name_hash"),
+                    "issuer_key_hash": payload.get("issuer_key_hash"),
+                    "serial_number": payload.get("serial_number"),
+                }
+            )
+
+        if command == "get_installed_certificate_ids":
+            kwargs = {}
+            cert_type = payload.get("certificate_type")
+            if cert_type:
+                kwargs["certificate_type"] = cert_type if isinstance(cert_type, list) else [cert_type]
+            return call201.GetInstalledCertificateIds(**kwargs)
+
+        if command == "certificate_signed":
+            kwargs = {"certificate_chain": payload.get("certificate_chain")}
+            cert_type = payload.get("certificate_type")
+            if cert_type:
+                kwargs["certificate_type"] = cert_type
+            return call201.CertificateSigned(**kwargs)
 
         raise ValueError(f"Command {command} not implemented for OCPP 2.0.1")
 
@@ -541,6 +585,28 @@ def org_for_cp(cp_id: str) -> str:
     if isinstance(entry, dict):
         return (entry.get("org_id") or "default").strip() or "default"
     return (entry or "default").strip() if isinstance(entry, str) else "default"
+
+def load_pnc():
+    return load_json(PNC_FILE, {"chargers": {}, "emaids": {}})
+
+
+def log_pnc_event(cp_id: str, emaid: str, alias: str, result: str, reason: str, certificate_present: bool = False):
+    """Push a PnC authorization event to Redis capped list."""
+    try:
+        evt = json.dumps({
+            "timestamp": iso_now(),
+            "cp_id": cp_id,
+            "emaid": emaid,
+            "alias": alias,
+            "result": result,
+            "reason": reason,
+            "certificate_present": certificate_present,
+        })
+        redis_client.lpush("pnc:events", evt)
+        redis_client.ltrim("pnc:events", 0, 499)
+    except Exception as e:
+        logger.warning("Failed to log PnC event: %s", e)
+
 
 def log_blocked_rfid(tag: str, cp_id: str):
     """Logga en tagg som nekats auktorisering."""
@@ -988,9 +1054,48 @@ class CentralSystemCP201(CP201):
     async def on_authorize(self, id_token, **kwargs):
         token_dict = make_json_safe(id_token) if id_token else {}
         id_tag = normalize_tag(token_dict.get("id_token") or token_dict.get("idToken"))
-        # evse_id is optional in Authorize
+        token_type = token_dict.get("type") or token_dict.get("token_type") or ""
         evse_id = kwargs.get("evse_id") or kwargs.get("evseId")
         self.track_tag(id_tag, evse_id)
+
+        certificate = kwargs.get("certificate")
+        iso_hash_data = kwargs.get("iso15118_certificate_hash_data") or kwargs.get("iso15118CertificateHashData")
+        is_pnc = str(token_type).lower() in ("emaid", "e_maid")
+
+        if is_pnc:
+            pnc = load_pnc()
+            charger_cfg = pnc.get("chargers", {}).get(self.id, {})
+            pnc_enabled = charger_cfg.get("pnc_enabled", False)
+            emaid_entry = pnc.get("emaids", {}).get(id_tag.upper(), {}) if id_tag else {}
+            alias = emaid_entry.get("alias", "")
+            cert_present = certificate is not None
+
+            if not pnc_enabled:
+                reason = "Charger PnC disabled"
+                log_pnc_event(self.id, id_tag or "", alias, "Rejected", reason, cert_present)
+                logger.info("[%s] PnC Authorize REJECTED emaid=%s reason=%s", self.id, id_tag, reason)
+                return call_result201.Authorize(
+                    id_token_info={"status": get_enum_member(AuthorizationStatus201, "blocked")},
+                    certificate_status=get_enum_member(AuthorizeCertificateStatusEnumType, "accepted") if cert_present else None,
+                )
+
+            if not emaid_entry or not emaid_entry.get("active", False):
+                reason = "eMAID not whitelisted" if not emaid_entry else "eMAID inactive"
+                log_pnc_event(self.id, id_tag or "", alias, "Rejected", reason, cert_present)
+                logger.info("[%s] PnC Authorize REJECTED emaid=%s reason=%s", self.id, id_tag, reason)
+                return call_result201.Authorize(
+                    id_token_info={"status": get_enum_member(AuthorizationStatus201, "blocked")},
+                    certificate_status=get_enum_member(AuthorizeCertificateStatusEnumType, "accepted") if cert_present else None,
+                )
+
+            log_pnc_event(self.id, id_tag or "", alias, "Accepted", "eMAID whitelisted, charger PnC enabled", cert_present)
+            logger.info("[%s] PnC Authorize ACCEPTED emaid=%s alias=%s", self.id, id_tag, alias)
+            resp = {"id_token_info": {"status": get_enum_member(AuthorizationStatus201, "accepted")}}
+            if cert_present:
+                resp["certificate_status"] = get_enum_member(AuthorizeCertificateStatusEnumType, "accepted")
+            return call_result201.Authorize(**resp)
+
+        # Standard RFID / non-PnC authorization
         ok = is_tag_allowed_on_cp(id_tag, self.id)
         if not ok:
             log_blocked_rfid(id_tag, self.id)
@@ -998,6 +1103,41 @@ class CentralSystemCP201(CP201):
         masked_tag = (id_tag[:4] + "***") if id_tag else "***"
         logger.info("[%s] Authorize (v2.0.1) id_tag=%s -> %s", self.id, masked_tag, getattr(status, "value", status))
         return call_result201.Authorize(id_token_info={"status": status})
+
+    # ── Plug & Charge handlers ──────────────────────────────────────
+
+    @on(Action201.sign_certificate)
+    async def on_sign_certificate(self, csr, certificate_type=None, **kwargs):
+        cert_type = make_json_safe(certificate_type) if certificate_type else "Unknown"
+        logger.info("[%s] SignCertificate type=%s csr_len=%d", self.id, cert_type, len(csr) if csr else 0)
+        try:
+            self.redis.setex(f"pnc:csr:{self.id}", 86400, json.dumps({
+                "csr": csr,
+                "certificate_type": cert_type,
+                "received_at": iso_now(),
+            }))
+        except Exception as e:
+            logger.warning("[%s] Failed to store CSR in Redis: %s", self.id, e)
+        return call_result201.SignCertificate(status=get_enum_member(GenericStatusEnumType, "accepted"))
+
+    @on(Action201.get_15118_ev_certificate)
+    async def on_get_15118_ev_certificate(self, iso15118_schema_version, action, exi_request, **kwargs):
+        action_val = make_json_safe(action) if action else "Unknown"
+        logger.info("[%s] Get15118EVCertificate schema=%s action=%s exi_len=%d",
+                     self.id, iso15118_schema_version, action_val, len(exi_request) if exi_request else 0)
+        return call_result201.Get15118EVCertificate(
+            status=get_enum_member(Iso15118EVCertificateStatusEnumType, "failed"),
+            exi_response="",
+        )
+
+    @on(Action201.get_certificate_status)
+    async def on_get_certificate_status(self, ocsp_request_data, **kwargs):
+        logger.info("[%s] GetCertificateStatus ocsp_request=%s", self.id, str(ocsp_request_data)[:200])
+        return call_result201.GetCertificateStatus(
+            status=get_enum_member(GetCertificateStatusEnumType, "failed"),
+        )
+
+    # ── End Plug & Charge handlers ───────────────────────────────────
 
     @on(Action201.data_transfer)
     async def on_data_transfer(self, vendor_id, **kwargs):

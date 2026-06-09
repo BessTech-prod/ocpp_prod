@@ -60,6 +60,7 @@ DISPLAY_PRESETS_FILE = BASE / "config" / "display_presets.json"
 DISPLAY_PRESETS_DIR = BASE / "display_presets"
 DIAGNOSTICS_META_FILE = BASE / "config" / "diagnostics.json"
 DIAGNOSTICS_DIR = BASE / "diagnostics"
+PNC_FILE = BASE / "config" / "pnc.json"
 
 ALLOWED_IMAGE_TYPES = {
     "image/png": ".png",
@@ -193,6 +194,12 @@ def load_diagnostics() -> dict:
 
 def save_diagnostics(d: dict):
     save_json(DIAGNOSTICS_META_FILE, d)
+
+def load_pnc() -> dict:
+    return load_json(PNC_FILE, {"chargers": {}, "emaids": {}})
+
+def save_pnc(d: dict):
+    save_json(PNC_FILE, d)
 
 def normalize_tag(tag: str) -> str:
     return (tag or "").strip().upper()
@@ -749,6 +756,68 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
             "retries": payload.get("retries"),
             "retry_interval": payload.get("retry_interval"),
         }
+
+    if command == "get_variables":
+        vars_list = payload.get("variables")
+        if not isinstance(vars_list, list):
+            raise HTTPException(400, "variables måste vara en lista")
+        for v in vars_list:
+            if not isinstance(v, dict) or "component" not in v or "variable" not in v:
+                raise HTTPException(400, "Varje variabel måste ha component och variable")
+        return {"variables": vars_list}
+
+    # ── Plug & Charge certificate commands ──────────────────────────
+
+    if command == "install_certificate":
+        valid_types = {"V2GRootCertificate", "MORootCertificate", "CSMSRootCertificate", "ManufacturerRootCertificate"}
+        cert_type = (payload.get("certificate_type") or "").strip()
+        if cert_type not in valid_types:
+            raise HTTPException(400, f"certificate_type måste vara en av: {', '.join(sorted(valid_types))}")
+        cert = (payload.get("certificate") or "").strip()
+        if not cert or not cert.startswith("-----BEGIN"):
+            raise HTTPException(400, "certificate måste vara en giltig PEM-sträng (börja med -----BEGIN)")
+        return {"certificate_type": cert_type, "certificate": cert}
+
+    if command == "delete_certificate":
+        valid_algos = {"SHA256", "SHA384", "SHA512"}
+        algo = (payload.get("hash_algorithm") or "").strip()
+        if algo not in valid_algos:
+            raise HTTPException(400, f"hash_algorithm måste vara en av: {', '.join(sorted(valid_algos))}")
+        for field in ("issuer_name_hash", "issuer_key_hash", "serial_number"):
+            if not (payload.get(field) or "").strip():
+                raise HTTPException(400, f"{field} krävs för delete_certificate")
+        return {
+            "hash_algorithm": algo,
+            "issuer_name_hash": payload["issuer_name_hash"].strip(),
+            "issuer_key_hash": payload["issuer_key_hash"].strip(),
+            "serial_number": payload["serial_number"].strip(),
+        }
+
+    if command == "get_installed_certificate_ids":
+        valid_types = {"V2GRootCertificate", "MORootCertificate", "CSMSRootCertificate",
+                       "V2GCertificateChain", "ManufacturerRootCertificate"}
+        raw = payload.get("certificate_type")
+        if raw:
+            if isinstance(raw, str):
+                raw = [raw]
+            for t in raw:
+                if t not in valid_types:
+                    raise HTTPException(400, f"Ogiltig certificate_type: {t}. Tillåtna: {', '.join(sorted(valid_types))}")
+            return {"certificate_type": raw}
+        return {}
+
+    if command == "certificate_signed":
+        chain = (payload.get("certificate_chain") or "").strip()
+        if not chain or not chain.startswith("-----BEGIN"):
+            raise HTTPException(400, "certificate_chain måste vara en giltig PEM-sträng (börja med -----BEGIN)")
+        result = {"certificate_chain": chain}
+        cert_type = (payload.get("certificate_type") or "").strip()
+        if cert_type:
+            valid_types = {"ChargingStationCertificate", "V2GCertificate"}
+            if cert_type not in valid_types:
+                raise HTTPException(400, f"certificate_type måste vara en av: {', '.join(sorted(valid_types))}")
+            result["certificate_type"] = cert_type
+        return result
 
     raise HTTPException(400, f"Ogiltigt command: {command}")
 
@@ -1351,6 +1420,11 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
         "clear_display_message",
         "get_transaction_status",
         "get_diagnostics",
+        "install_certificate",
+        "delete_certificate",
+        "get_installed_certificate_ids",
+        "certificate_signed",
+        "get_variables",
     }
     if command not in allowed_commands:
         raise HTTPException(400, f"Ogiltigt command. Tillåtna: {', '.join(sorted(allowed_commands))}")
@@ -3259,6 +3333,131 @@ async def api_diagnostics_delete(diag_id: str, session=Depends(require_installer
     return {"ok": True}
 
 # =====================================================================
+# PLUG & CHARGE API
+# =====================================================================
+class PncChargerPatchBody(BaseModel):
+    pnc_enabled: bool
+
+class PncEmaidBody(BaseModel):
+    emaid: str
+    alias: Optional[str] = ""
+    active: Optional[bool] = True
+    org_id: Optional[str] = "default"
+
+class PncEmaidPatchBody(BaseModel):
+    alias: Optional[str] = None
+    active: Optional[bool] = None
+    org_id: Optional[str] = None
+
+@app.get("/api/pnc/chargers")
+async def api_pnc_chargers(session=Depends(require_installer_or_higher)):
+    pnc = load_pnc()
+    cps = load_cps_map()
+    chargers_cfg = pnc.get("chargers", {})
+    items = []
+    for cp_id, cp_entry in cps.items():
+        if isinstance(cp_entry, str):
+            cp_entry = {"org_id": cp_entry}
+        cfg = chargers_cfg.get(cp_id, {})
+        items.append({
+            "cp_id": cp_id,
+            "alias": cp_entry.get("alias") or cp_id,
+            "org_id": cp_entry.get("org_id") or "default",
+            "pnc_enabled": cfg.get("pnc_enabled", False),
+            "updated_at": cfg.get("updated_at", ""),
+            "updated_by": cfg.get("updated_by", ""),
+        })
+    return {"items": items}
+
+@app.patch("/api/pnc/chargers/{cp_id}")
+async def api_pnc_charger_patch(cp_id: str, body: PncChargerPatchBody, session=Depends(require_installer_or_higher)):
+    pnc = load_pnc()
+    chargers = pnc.setdefault("chargers", {})
+    chargers[cp_id] = {
+        "pnc_enabled": body.pnc_enabled,
+        "updated_at": iso_now(),
+        "updated_by": session.get("email", "unknown"),
+    }
+    save_pnc(pnc)
+    logger.info("PnC charger %s set to %s by %s", cp_id, body.pnc_enabled, session.get("email"))
+    return {"ok": True, "cp_id": cp_id, "pnc_enabled": body.pnc_enabled}
+
+@app.get("/api/pnc/emaids")
+async def api_pnc_emaids(session=Depends(require_installer_or_higher)):
+    pnc = load_pnc()
+    emaids = pnc.get("emaids", {})
+    items = []
+    for emaid, entry in emaids.items():
+        items.append({
+            "emaid": emaid,
+            "alias": entry.get("alias", ""),
+            "active": entry.get("active", True),
+            "org_id": entry.get("org_id", "default"),
+            "updated_at": entry.get("updated_at", ""),
+        })
+    return {"items": items}
+
+@app.post("/api/pnc/emaids")
+async def api_pnc_emaid_create(body: PncEmaidBody, session=Depends(require_installer_or_higher)):
+    emaid = (body.emaid or "").strip().upper()
+    if not emaid:
+        raise HTTPException(400, "eMAID kr\u00e4vs")
+    pnc = load_pnc()
+    emaids = pnc.setdefault("emaids", {})
+    if emaid in emaids:
+        raise HTTPException(409, f"eMAID {emaid} finns redan i vitlistan")
+    emaids[emaid] = {
+        "alias": (body.alias or "").strip(),
+        "active": body.active if body.active is not None else True,
+        "org_id": (body.org_id or "default").strip(),
+        "updated_at": iso_now(),
+    }
+    save_pnc(pnc)
+    logger.info("PnC eMAID added: %s alias=%s by %s", emaid, body.alias, session.get("email"))
+    return {"ok": True, "emaid": emaid}
+
+@app.patch("/api/pnc/emaids/{emaid}")
+async def api_pnc_emaid_patch(emaid: str, body: PncEmaidPatchBody, session=Depends(require_installer_or_higher)):
+    emaid = emaid.strip().upper()
+    pnc = load_pnc()
+    emaids = pnc.get("emaids", {})
+    if emaid not in emaids:
+        raise HTTPException(404, f"eMAID {emaid} finns inte i vitlistan")
+    entry = emaids[emaid]
+    if body.alias is not None:
+        entry["alias"] = body.alias.strip()
+    if body.active is not None:
+        entry["active"] = body.active
+    if body.org_id is not None:
+        entry["org_id"] = body.org_id.strip()
+    entry["updated_at"] = iso_now()
+    save_pnc(pnc)
+    logger.info("PnC eMAID updated: %s by %s", emaid, session.get("email"))
+    return {"ok": True, "emaid": emaid}
+
+@app.delete("/api/pnc/emaids/{emaid}")
+async def api_pnc_emaid_delete(emaid: str, session=Depends(require_installer_or_higher)):
+    emaid = emaid.strip().upper()
+    pnc = load_pnc()
+    emaids = pnc.get("emaids", {})
+    if emaid not in emaids:
+        raise HTTPException(404, f"eMAID {emaid} finns inte i vitlistan")
+    del emaids[emaid]
+    save_pnc(pnc)
+    logger.info("PnC eMAID deleted: %s by %s", emaid, session.get("email"))
+    return {"ok": True, "emaid": emaid}
+
+@app.get("/api/pnc/events")
+async def api_pnc_events(limit: int = Query(100, ge=1, le=500), session=Depends(require_installer_or_higher)):
+    try:
+        raw = redis_client.lrange("pnc:events", 0, limit - 1)
+        events = [json.loads(r.decode() if isinstance(r, bytes) else r) for r in (raw or [])]
+    except Exception as e:
+        logger.warning("Failed to read PnC events from Redis: %s", e)
+        events = []
+    return {"items": events}
+
+# =====================================================================
 # HEALTH CHECK
 # =====================================================================
 @app.get("/health")
@@ -3285,6 +3484,9 @@ async def startup():
     DIAGNOSTICS_DIR.mkdir(parents=True, exist_ok=True)
     if not DIAGNOSTICS_META_FILE.exists():
         save_diagnostics({})
+
+    if not PNC_FILE.exists():
+        save_pnc({"chargers": {}, "emaids": {}})
 
     migrated = migrate_rfids_from_users_if_needed()
     added = 0

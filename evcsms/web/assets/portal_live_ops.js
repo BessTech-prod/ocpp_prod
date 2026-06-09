@@ -46,7 +46,7 @@
       versions: ['1.6', '2.0.1'],
       argLabel: 'Meddelande',
       args16: ['StatusNotification', 'Heartbeat', 'BootNotification', 'MeterValues', 'FirmwareStatusNotification', 'DiagnosticsStatusNotification', 'LogStatusNotification', 'SignChargePointCertificate'],
-      args201: ['StatusNotification', 'Heartbeat', 'BootNotification', 'MeterValues', 'FirmwareStatusNotification', 'LogStatusNotification', 'TransactionEvent', 'SignChargingStationCertificate', 'PublishFirmwareStatusNotification'],
+      args201: ['StatusNotification', 'Heartbeat', 'BootNotification', 'MeterValues', 'FirmwareStatusNotification', 'LogStatusNotification', 'TransactionEvent', 'SignChargingStationCertificate', 'SignV2GCertificate', 'SignCombinedCertificate', 'PublishFirmwareStatusNotification'],
       showConnector: true,
     },
     clear_cache: {
@@ -128,6 +128,28 @@
       label: 'Transaktionsstatus',
       versions: ['2.0.1'],
       showConnector: false,
+    },
+    install_certificate: {
+      label: 'Installera certifikat',
+      versions: ['2.0.1'],
+      showCertType: true,
+      showCertPem: true,
+    },
+    get_installed_certificate_ids: {
+      label: 'Lista certifikat',
+      versions: ['2.0.1'],
+      showCertTypeFilter: true,
+    },
+    delete_certificate: {
+      label: 'Ta bort certifikat',
+      versions: ['2.0.1'],
+      showCertHash: true,
+    },
+    certificate_signed: {
+      label: 'Skicka signerat certifikat',
+      versions: ['2.0.1'],
+      showCertSignedType: true,
+      showCertPem: true,
     },
   };
 
@@ -365,6 +387,11 @@
     toggleField('#setVarValueWrap', !!cfg.showSetVarValue);
     toggleField('#getLogWrap', !!cfg.showGetLog);
     toggleField('#updateFirmwareWrap', !!cfg.showUpdateFirmware);
+    toggleField('#certPemWrap', !!cfg.showCertPem);
+    toggleField('#certTypeWrap', !!cfg.showCertType);
+    toggleField('#certTypeFilterWrap', !!cfg.showCertTypeFilter);
+    toggleField('#certHashWrap', !!cfg.showCertHash);
+    toggleField('#certSignedTypeWrap', !!cfg.showCertSignedType);
 
     const cfgSelect = $('#configKeySelect');
     if (cfgSelect && cfg.showConfigKeys) {
@@ -517,6 +544,32 @@
        payload.retrieve_date_time = date;
     } else if (command === 'customer_information') {
        if (idTag) payload.id_token = { idToken: idTag, type: 'ISO14443' };
+    } else if (command === 'install_certificate') {
+      const certType = ($('#certTypeSelect')?.value || '').trim();
+      const certPem = ($('#certPemInput')?.value || '').trim();
+      if (!certType) { UI.alert('Välj certifikattyp.'); return; }
+      if (!certPem || !certPem.startsWith('-----BEGIN')) { UI.alert('Ange ett giltigt PEM-certifikat.'); return; }
+      payload.certificate_type = certType;
+      payload.certificate = certPem;
+    } else if (command === 'get_installed_certificate_ids') {
+      const filterType = ($('#certTypeFilterSelect')?.value || '').trim();
+      if (filterType) payload.certificate_type = filterType;
+    } else if (command === 'delete_certificate') {
+      const algo = ($('#certHashAlgo')?.value || '').trim();
+      const issuerName = ($('#certIssuerNameHash')?.value || '').trim();
+      const issuerKey = ($('#certIssuerKeyHash')?.value || '').trim();
+      const serial = ($('#certSerialNumber')?.value || '').trim();
+      if (!algo || !issuerName || !issuerKey || !serial) { UI.alert('Fyll i alla hash-fält.'); return; }
+      payload.hash_algorithm = algo;
+      payload.issuer_name_hash = issuerName;
+      payload.issuer_key_hash = issuerKey;
+      payload.serial_number = serial;
+    } else if (command === 'certificate_signed') {
+      const certPem = ($('#certPemInput')?.value || '').trim();
+      if (!certPem || !certPem.startsWith('-----BEGIN')) { UI.alert('Ange en giltig PEM-certifikatkedja.'); return; }
+      payload.certificate_chain = certPem;
+      const signedType = ($('#certSignedTypeSelect')?.value || '').trim();
+      if (signedType) payload.certificate_type = signedType;
     } else if (command === 'set_display_message') {
       const pick = ($('#presetPick')?.value || '').trim();
       let url = '';

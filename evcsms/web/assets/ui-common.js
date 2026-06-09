@@ -45,6 +45,12 @@
     if (!r.ok) throw new Error(`${url} -> ${r.status} ${await r.text().catch(()=> "")}`);
     return r.json();
   };
+  UI.patchJSON = async function patchJSON(url, body) {
+    const r = await fetch(url, { method:"PATCH", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body??{}) });
+    await handle401(r);
+    if (!r.ok) throw new Error(`${url} -> ${r.status} ${await r.text().catch(()=> "")}`);
+    return r.json();
+  };
   UI.deleteJSON = async function deleteJSON(url) {
     const r = await fetch(url, { method:"DELETE" });
     await handle401(r);
