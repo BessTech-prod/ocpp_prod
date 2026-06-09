@@ -263,9 +263,28 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
                 request_id=req_id,
                 report=payload.get("report", True),
                 clear=payload.get("clear", False),
-                customer_id=payload.get("customer_id"),
+                customer_identifier=payload.get("customer_id"),
                 id_token=payload.get("id_token")
             )
+
+        if command == "change_availability":
+            op_status = str(payload.get("type", "Operative"))
+            kwargs = {"operational_status": op_status}
+            evse_id = payload.get("connector_id")
+            if evse_id not in (None, "", 0, "0"):
+                kwargs["evse"] = {"id": int(evse_id)}
+            return call201.ChangeAvailability(**kwargs)
+
+        if command == "trigger_message":
+            requested_message = str(payload.get("requested_message", "StatusNotification"))
+            kwargs = {"requested_message": requested_message}
+            connector = payload.get("connector_id")
+            if connector not in (None, ""):
+                kwargs["evse"] = {"id": int(connector)}
+            return call201.TriggerMessage(**kwargs)
+
+        if command == "clear_cache":
+            return call201.ClearCache()
 
         raise ValueError(f"Command {command} not implemented for OCPP 2.0.1")
 
@@ -325,6 +344,16 @@ def build_ocpp_call(command: str, payload: dict, version: str = "1.6"):
         if payload.get("retry_interval") is not None:
             kwargs["retry_interval"] = int(payload["retry_interval"])
         return call.GetDiagnostics(**kwargs)
+
+    if command == "update_firmware":
+        location = str(payload.get("location", ""))
+        retrieve_date = str(payload.get("retrieve_date") or payload.get("retrieve_date_time") or "")
+        kwargs = {"location": location, "retrieve_date": retrieve_date}
+        if payload.get("retries") is not None:
+            kwargs["retries"] = int(payload["retries"])
+        if payload.get("retry_interval") is not None:
+            kwargs["retry_interval"] = int(payload["retry_interval"])
+        return call.UpdateFirmware(**kwargs)
 
     raise ValueError(f"Unsupported command: {command}")
 

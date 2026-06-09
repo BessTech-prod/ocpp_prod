@@ -588,12 +588,21 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
     if command == "trigger_message":
         requested_message = str(payload.get("requested_message", "StatusNotification")).strip() or "StatusNotification"
         allowed_messages = {
+            # OCPP 1.6J
             "BootNotification",
             "DiagnosticsStatusNotification",
             "FirmwareStatusNotification",
             "Heartbeat",
             "MeterValues",
             "StatusNotification",
+            "LogStatusNotification",
+            "SignChargePointCertificate",
+            # OCPP 2.0.1
+            "TransactionEvent",
+            "SignChargingStationCertificate",
+            "SignV2GCertificate",
+            "SignCombinedCertificate",
+            "PublishFirmwareStatusNotification",
         }
         if requested_message not in allowed_messages:
             raise HTTPException(400, f"requested_message måste vara en av: {', '.join(sorted(allowed_messages))}")
@@ -703,9 +712,12 @@ def validate_ocpp_command_payload(command: str, payload: Optional[Dict[str, Any]
         loc = (payload.get("location") or "").strip()
         if not loc:
             raise HTTPException(400, "location krävs för update_firmware")
+        retrieve_dt = str(payload.get("retrieve_date_time") or payload.get("retrieve_date") or "").strip()
+        if not retrieve_dt:
+            raise HTTPException(400, "retrieve_date_time krävs för update_firmware")
         return {
             "location": loc,
-            "retrieve_date_time": str(payload.get("retrieve_date_time") or ""),
+            "retrieve_date_time": retrieve_dt,
             "retries": payload.get("retries"),
             "retry_interval": payload.get("retry_interval"),
             "request_id": payload.get("request_id")
@@ -1338,6 +1350,7 @@ async def api_portal_ocpp_command(body: OcppCommandBody, session=Depends(require
         "customer_information",
         "clear_display_message",
         "get_transaction_status",
+        "get_diagnostics",
     }
     if command not in allowed_commands:
         raise HTTPException(400, f"Ogiltigt command. Tillåtna: {', '.join(sorted(allowed_commands))}")

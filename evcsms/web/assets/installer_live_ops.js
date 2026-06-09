@@ -36,21 +36,22 @@
     },
     change_availability: {
       label: 'Ändra tillgänglighet',
-      versions: ['1.6'],
+      versions: ['1.6', '2.0.1'],
       argLabel: 'Tillgänglighet',
       args: ['Operative', 'Inoperative'],
       showConnector: true,
     },
     trigger_message: {
       label: 'TriggerMessage',
-      versions: ['1.6'],
+      versions: ['1.6', '2.0.1'],
       argLabel: 'Meddelande',
-      args: ['StatusNotification', 'Heartbeat', 'BootNotification', 'MeterValues', 'FirmwareStatusNotification', 'DiagnosticsStatusNotification'],
+      args16: ['StatusNotification', 'Heartbeat', 'BootNotification', 'MeterValues', 'FirmwareStatusNotification', 'DiagnosticsStatusNotification', 'LogStatusNotification', 'SignChargePointCertificate'],
+      args201: ['StatusNotification', 'Heartbeat', 'BootNotification', 'MeterValues', 'FirmwareStatusNotification', 'LogStatusNotification', 'TransactionEvent', 'SignChargingStationCertificate', 'PublishFirmwareStatusNotification'],
       showConnector: true,
     },
     clear_cache: {
       label: 'ClearCache',
-      versions: ['1.6'],
+      versions: ['1.6', '2.0.1'],
       showConnector: false,
     },
     unlock_connector: {
@@ -110,7 +111,7 @@
     },
     update_firmware: {
       label: 'Uppdatera firmware',
-      versions: ['2.0.1'],
+      versions: ['1.6', '2.0.1'],
       showUpdateFirmware: true,
     },
     customer_information: {
