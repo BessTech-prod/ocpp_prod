@@ -61,6 +61,7 @@ DISPLAY_PRESETS_DIR = BASE / "display_presets"
 DIAGNOSTICS_META_FILE = BASE / "config" / "diagnostics.json"
 DIAGNOSTICS_DIR = BASE / "diagnostics"
 PNC_FILE = BASE / "config" / "pnc.json"
+BLOCKED_EMAIDS_FILE = BASE / "config" / "blocked_emaids.json"
 
 ALLOWED_IMAGE_TYPES = {
     "image/png": ".png",
@@ -3413,6 +3414,13 @@ async def api_pnc_emaid_create(body: PncEmaidBody, session=Depends(require_insta
         "updated_at": iso_now(),
     }
     save_pnc(pnc)
+    # Remove from blocked list if present
+    try:
+        blocked = load_json(BLOCKED_EMAIDS_FILE, [])
+        if any(b.get("emaid") == emaid for b in blocked):
+            blocked = [b for b in blocked if b.get("emaid") != emaid]
+            save_json(BLOCKED_EMAIDS_FILE, blocked)
+    except: pass
     logger.info("PnC eMAID added: %s alias=%s by %s", emaid, body.alias, session.get("email"))
     return {"ok": True, "emaid": emaid}
 
@@ -3456,6 +3464,17 @@ async def api_pnc_events(limit: int = Query(100, ge=1, le=500), session=Depends(
         logger.warning("Failed to read PnC events from Redis: %s", e)
         events = []
     return {"items": events}
+
+@app.get("/api/pnc/blocked_emaids")
+async def api_pnc_blocked_emaids(session=Depends(require_installer_or_higher)):
+    """Return list of rejected eMAID attempts."""
+    return {"items": load_json(BLOCKED_EMAIDS_FILE, [])}
+
+@app.post("/api/pnc/blocked_emaids/clear")
+async def api_pnc_blocked_emaids_clear(session=Depends(require_installer_or_higher)):
+    """Clear all rejected eMAID attempts."""
+    save_json(BLOCKED_EMAIDS_FILE, [])
+    return {"ok": True}
 
 # =====================================================================
 # HEALTH CHECK

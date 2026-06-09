@@ -147,6 +147,30 @@
       </div>
     </section>
 
+    <!-- Blocked eMAIDs -->
+    <section class="content-panel mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0 fw-bold"><i class="bi bi-shield-exclamation"></i> Nekade eMAID-försök</h2>
+        <button class="btn btn-sm btn-outline-danger" id="btnClearBlockedEmaids" type="button"><i class="bi bi-trash"></i> Rensa lista</button>
+      </div>
+      <p class="text-muted small mb-2">eMAID som nekats vid PnC-auktorisering. Klicka "Vitlista" för att lägga till i vitlistan.</p>
+      <div class="table-panel">
+        <table class="table table-hover align-middle mb-0" id="blockedEmaidsTable">
+          <thead class="table-dark">
+            <tr>
+              <th>Tid</th>
+              <th>eMAID</th>
+              <th>Laddare</th>
+              <th class="text-end">Åtgärd</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" class="text-center text-muted py-4">Laddar...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- PnC Event Log -->
     <section class="content-panel mb-4">
       <h2 class="h5 mb-3 fw-bold"><i class="bi bi-journal-text"></i> PnC-händelselogg</h2>

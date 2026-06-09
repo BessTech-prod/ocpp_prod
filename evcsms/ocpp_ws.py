@@ -109,6 +109,7 @@ RFIDS_FILE = BASE / "config" / "rfids.json"
 BLOCKED_RFIDS_FILE = BASE / "blocked_rfids.json"
 DIAGNOSTICS_META_FILE = BASE / "config" / "diagnostics.json"
 PNC_FILE = BASE / "config" / "pnc.json"
+BLOCKED_EMAIDS_FILE = BASE / "config" / "blocked_emaids.json"
 
 # =====================================================================
 # REDIS CLIENT
@@ -608,6 +609,32 @@ def log_pnc_event(cp_id: str, emaid: str, alias: str, result: str, reason: str, 
         logger.warning("Failed to log PnC event: %s", e)
 
 
+def log_blocked_emaid(emaid: str, cp_id: str):
+    """Log an eMAID that was rejected during PnC authorization."""
+    emaid = (emaid or "").strip().upper()
+    if not emaid:
+        return
+    try:
+        blocked = load_json(BLOCKED_EMAIDS_FILE, [])
+        if not isinstance(blocked, list):
+            blocked = []
+        entry = {
+            "emaid": emaid,
+            "cp_id": cp_id,
+            "timestamp": iso_now(),
+        }
+        for existing in blocked:
+            if existing.get("emaid") == emaid:
+                existing["timestamp"] = entry["timestamp"]
+                existing["cp_id"] = cp_id
+                break
+        else:
+            blocked.insert(0, entry)
+        save_json(BLOCKED_EMAIDS_FILE, blocked[:100])
+    except Exception as e:
+        logger.error("Failed to log blocked eMAID: %s", e)
+
+
 def log_blocked_rfid(tag: str, cp_id: str):
     """Logga en tagg som nekats auktorisering."""
     tag = normalize_tag(tag)
@@ -1073,6 +1100,7 @@ class CentralSystemCP201(CP201):
             if not pnc_enabled:
                 reason = "Charger PnC disabled"
                 log_pnc_event(self.id, id_tag or "", alias, "Rejected", reason, cert_present)
+                log_blocked_emaid(id_tag or "", self.id)
                 logger.info("[%s] PnC Authorize REJECTED emaid=%s reason=%s", self.id, id_tag, reason)
                 return call_result201.Authorize(
                     id_token_info={"status": get_enum_member(AuthorizationStatus201, "blocked")},
@@ -1082,6 +1110,7 @@ class CentralSystemCP201(CP201):
             if not emaid_entry or not emaid_entry.get("active", False):
                 reason = "eMAID not whitelisted" if not emaid_entry else "eMAID inactive"
                 log_pnc_event(self.id, id_tag or "", alias, "Rejected", reason, cert_present)
+                log_blocked_emaid(id_tag or "", self.id)
                 logger.info("[%s] PnC Authorize REJECTED emaid=%s reason=%s", self.id, id_tag, reason)
                 return call_result201.Authorize(
                     id_token_info={"status": get_enum_member(AuthorizationStatus201, "blocked")},

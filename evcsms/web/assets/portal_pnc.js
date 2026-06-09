@@ -6,6 +6,8 @@
     emaidPatch: (id) => `/api/pnc/emaids/${encodeURIComponent(id)}`,
     emaidDelete: (id) => `/api/pnc/emaids/${encodeURIComponent(id)}`,
     events: '/api/pnc/events',
+    blockedEmaids: '/api/pnc/blocked_emaids',
+    clearBlockedEmaids: '/api/pnc/blocked_emaids/clear',
     orgs: '/api/orgs',
   };
 
@@ -16,6 +18,7 @@
     chargers: [],
     emaids: [],
     events: [],
+    blockedEmaids: [],
     orgs: {},
     editingEmaid: null,
     eventTimer: null,
@@ -181,6 +184,7 @@
       }
       cancelEditEmaid();
       await fetchEmaids();
+      await fetchBlockedEmaids();
     } catch(e){
       UI.alert('Kunde inte spara eMAID: ' + (e.message || e));
     }
@@ -197,6 +201,61 @@
       await fetchEmaids();
     } catch(e){
       UI.alert('Kunde inte ta bort eMAID: ' + (e.message || e));
+    }
+  }
+
+  // ── Blocked eMAIDs table ──────────────────────────────────────────
+
+  async function fetchBlockedEmaids(){
+    try {
+      const res = await UI.getJSON(API.blockedEmaids);
+      state.blockedEmaids = res.items || [];
+    } catch(e){ state.blockedEmaids = []; }
+    renderBlockedEmaids();
+  }
+
+  function renderBlockedEmaids(){
+    const tbody = $('#blockedEmaidsTable tbody');
+    if (!tbody) return;
+    const rows = state.blockedEmaids || [];
+    if (!rows.length){
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Inga nekade eMAID-försök loggade.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map((r) => {
+      const ts = r.timestamp ? new Date(r.timestamp).toLocaleString('sv-SE') : '–';
+      return `<tr>
+        <td class="small">${esc(ts)}</td>
+        <td class="font-monospace">${esc(r.emaid || '–')}</td>
+        <td>${esc(r.cp_id || '–')}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-primary btn-whitelist-blocked" data-blocked-emaid="${esc(r.emaid)}" type="button">
+            <i class="bi bi-plus-circle"></i> Vitlista
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  function whitelistBlocked(emaid){
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    cancelEditEmaid();
+    $('#emaidInput').value = emaid;
+    const formPanel = $('#emaid-form').closest('.content-panel');
+    if (formPanel){
+      formPanel.classList.add('highlight-pulse');
+      setTimeout(() => formPanel.classList.remove('highlight-pulse'), 2000);
+    }
+    UI.alert(`Fyll i alias för ${emaid} och klicka "Lägg till" för att vitlista.`, 'info');
+  }
+
+  async function clearBlockedEmaids(){
+    if (!confirm('Vill du rensa listan på alla nekade eMAID-försök?')) return;
+    try {
+      await UI.postJSON(API.clearBlockedEmaids, {});
+      await fetchBlockedEmaids();
+    } catch(e){
+      UI.alert('Kunde inte rensa: ' + (e.message || e));
     }
   }
 
@@ -247,7 +306,15 @@
         deleteEmaid(deleteBtn.dataset.emaid);
         return;
       }
+      const whitelistBtn = e.target.closest('.btn-whitelist-blocked');
+      if (whitelistBtn){
+        whitelistBlocked(whitelistBtn.dataset.blockedEmaid);
+        return;
+      }
     });
+
+    const clearBtn = $('#btnClearBlockedEmaids');
+    if (clearBtn) clearBtn.addEventListener('click', clearBlockedEmaids);
 
     const form = $('#emaid-form');
     if (form) form.addEventListener('submit', saveEmaid);
@@ -263,7 +330,7 @@
     if (!me) return;
 
     await fetchOrgs();
-    await Promise.all([fetchChargers(), fetchEmaids(), fetchEvents()]);
+    await Promise.all([fetchChargers(), fetchEmaids(), fetchEvents(), fetchBlockedEmaids()]);
     setupListeners();
     state.eventTimer = setInterval(fetchEvents, 10000);
   }
