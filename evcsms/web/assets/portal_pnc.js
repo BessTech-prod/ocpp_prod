@@ -259,6 +259,9 @@
   // ── Init ──────────────────────────────────────────────────────────
 
   async function init(){
+    const me = await UI.initPage({ requiredRoles: ['portal_admin', 'admin', 'installer'] });
+    if (!me) return;
+
     await fetchOrgs();
     await Promise.all([fetchChargers(), fetchEmaids(), fetchEvents()]);
     setupListeners();
