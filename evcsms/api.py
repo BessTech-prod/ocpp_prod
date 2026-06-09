@@ -3369,7 +3369,7 @@ async def api_pnc_chargers(session=Depends(require_installer_or_higher)):
         })
     return {"items": items}
 
-@app.patch("/api/pnc/chargers/{cp_id}")
+@app.patch("/api/pnc/chargers/{cp_id:path}")
 async def api_pnc_charger_patch(cp_id: str, body: PncChargerPatchBody, session=Depends(require_installer_or_higher)):
     pnc = load_pnc()
     chargers = pnc.setdefault("chargers", {})
