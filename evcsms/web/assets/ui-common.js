@@ -262,10 +262,6 @@
       <h5 class="m-0 fw-bold text-dark d-none d-md-block">${UI.esc(pageTitle)}</h5>
       <div class="ms-auto d-flex align-items-center gap-3">
          <div id="me-display-sidebar" class="small text-muted d-none d-lg-block">${UI.esc(me?.email || '')}</div>
-         <div class="form-check form-switch d-none d-sm-block">
-            <input class="form-check-input" type="checkbox" id="themeToggleSidebar">
-            <label class="form-check-label small text-muted" for="themeToggleSidebar"><i class="bi bi-moon-stars"></i></label>
-         </div>
       </div>
     `;
 
@@ -286,13 +282,38 @@
       originalNavbar.classList.add('d-none');
     }
 
+    // Mobile sidebar overlay (click outside to close)
+    const sidebarOverlay = document.createElement('div');
+    sidebarOverlay.className = 'sidebar-overlay';
+    layout.appendChild(sidebarOverlay);
+
+    function openSidebar() {
+      sidebar.classList.add('show');
+      sidebarOverlay.classList.add('active');
+    }
+    function closeSidebar() {
+      sidebar.classList.remove('show');
+      sidebarOverlay.classList.remove('active');
+    }
+
     // Mobile Toggle Logic
     const toggle = document.getElementById('sidebarToggle');
     if (toggle) {
       toggle.addEventListener('click', () => {
-        sidebar.classList.toggle('show');
+        if (sidebar.classList.contains('show')) closeSidebar();
+        else openSidebar();
       });
     }
+
+    // Click overlay to close sidebar
+    sidebarOverlay.addEventListener('click', closeSidebar);
+
+    // Close sidebar when a link is clicked (mobile)
+    sidebar.querySelectorAll('.sidebar-link').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth < 992) closeSidebar();
+      });
+    });
 
     // Highlight active link in sidebar
     UI.highlightActiveSidebar();

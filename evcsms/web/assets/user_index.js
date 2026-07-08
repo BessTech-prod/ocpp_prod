@@ -94,7 +94,6 @@
               </div>
               <span class="ms-1">${alias}</span>
             </h5>
-            <div class="small text-muted mb-3">ID: ${cpId}</div>
             <div class="d-flex flex-column gap-2">
               <div class="d-flex justify-content-between align-items-center p-2 rounded-2 bg-light bg-opacity-50">
                 <span class="small fw-bold">Uttag 1</span>

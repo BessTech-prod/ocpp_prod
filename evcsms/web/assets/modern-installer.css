@@ -76,8 +76,7 @@ body.modern-ui {
   height: 52px;
   width: auto;
   object-fit: contain;
-  image-rendering: -webkit-optimize-contrast;
-  /* filter: brightness(0) invert(1); */ /* User wants logo in color */
+  image-rendering: auto;
 }
 
 .sidebar-nav {
@@ -216,6 +215,21 @@ body.modern-ui {
   display: none !important;
 }
 
+/* Sidebar overlay (click outside to close on mobile) */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1049; /* just below sidebar z-index */
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.sidebar-overlay.active {
+  display: block;
+  opacity: 1;
+}
+
 /* Responsive Sidebar */
 @media (max-width: 991.98px) {
   body.modern-ui {
@@ -224,6 +238,7 @@ body.modern-ui {
   .sidebar {
     transform: translateX(-100%);
     opacity: 1 !important;
+    z-index: 1050;
   }
   .main-content {
     margin-left: 0;
@@ -232,7 +247,7 @@ body.modern-ui {
     transform: translateX(0);
   }
   .modern-ui .navbar {
-    display: flex !important; /* Keep mobile navbar if needed, or implement toggle */
+    display: flex !important;
   }
 }
 

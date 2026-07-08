@@ -23,15 +23,12 @@
           <li class="nav-item"><a class="nav-link js-go-dashboard" href="javascript:void(0)"><i class="bi bi-speedometer2"></i> Överblick</a></li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/portal/live_ops.html"><i class="bi bi-broadcast-pin"></i> Live driftpanel</a></li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/portal/cps.html"><i class="bi bi-diagram-3"></i> Laddare</a></li>
-          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/instructions.html"><i class="bi bi-info-circle"></i> Instruktioner</a></li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,installer">
             <a href="#" class="nav-link"
                data-route-portal="/portal/rfid.html"
                data-route-org="/org/rfid.html"
                data-route-user="/user/index.html"><i class="bi bi-upc-scan"></i> RFID</a>
           </li>
-
-          <!-- ROLL‑MEDVETNA LÄNKAR (gemensamma sidor) -->
           <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,installer">
             <a href="#" class="nav-link"
                data-route-portal="/portal/add_user.html"
@@ -43,24 +40,24 @@
               <i class="bi bi-building-gear"></i> Organisationer
             </a>
           </li>
-          <li class="nav-item" data-visible-roles="portal_admin,admin">
-            <a class="nav-link" href="/portal/api_keys.html">
-              <i class="bi bi-code-square"></i> Integrations
-            </a>
-          </li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin">
             <a href="#" class="nav-link"
                data-route-portal="/users_history.html"
                data-route-org="/org/history.html"
                data-route-user="/user/index.html"><i class="bi bi-clock-history"></i> Historik</a>
           </li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin">
+            <a class="nav-link" href="/portal/api_keys.html">
+              <i class="bi bi-code-square"></i> Integrations
+            </a>
+          </li>
+          <li class="nav-item" data-visible-roles="portal_admin,admin,installer"><a class="nav-link" href="/instructions.html"><i class="bi bi-info-circle"></i> Instruktioner</a></li>
           <li class="nav-item" data-visible-roles="portal_admin,admin,org_admin,user,installer">
             <a href="#" class="nav-link"
                data-route-portal="/my.html"
                data-route-org="/org/my.html"
                data-route-user="/user/my.html"><i class="bi bi-person-badge"></i> Min statistik</a>
           </li>
-
           <li class="nav-item"><span id="me-display" class="navbar-text small opacity-75"></span></li>
           <li class="nav-item"><button id="btnLogout" class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-box-arrow-right"></i> Logga ut</button></li>
         </ul>
