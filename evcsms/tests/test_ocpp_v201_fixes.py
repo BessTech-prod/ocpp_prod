@@ -93,6 +93,9 @@ class TestOCPP201Fixes(unittest.TestCase):
     def test_on_transaction_event_camelcase(self, mock_redis):
         cp = CentralSystemCP201("test_cp", MagicMock())
         cp.redis = mock_redis
+        # Updated events now look up the open transaction from Redis;
+        # return None to simulate no open tx (safe no-op path).
+        mock_redis.get.return_value = None
         
         import asyncio
         async def run_test():
@@ -181,6 +184,266 @@ class TestOCPP201Fixes(unittest.TestCase):
         self.assertEqual(entry["meter_start"], 100.0)
         self.assertEqual(entry["meter_stop"], 150.0)
         self.assertEqual(entry["id_tag"], "NEW_TAG")
+
+    # ── Tests for Updated event handling (the root cause of intermittent reporting) ──
+
+    @patch("ocpp_ws.redis_client")
+    def test_updated_event_captures_meter_values(self, mock_redis):
+        """Updated events carry periodic meter readings that must be
+        stored on the open transaction so the Ended handler can use them."""
+        cp = CentralSystemCP201("test_cp", MagicMock())
+        cp.redis = mock_redis
+
+        tx_id = "tx_meter_update"
+        open_entry = {
+            "transaction_id": tx_id,
+            "charge_point": "test_cp",
+            "connectorId": 1,
+            "id_tag": "TAG1",
+            "meter_start": 1000.0,
+            "meter_stop": None,
+            "start_time": "2026-07-19T08:00:00Z",
+        }
+        mock_redis.get.return_value = json.dumps(open_entry).encode()
+
+        import asyncio
+        async def run_test():
+            await cp.on_transaction_event(
+                event_type="Updated",
+                timestamp="2026-07-19T08:30:00Z",
+                trigger_reason="MeterValuePeriodic",
+                seq_no=5,
+                transaction_info={"transactionId": tx_id},
+                evse={"id": 1},
+                meterValue=[{
+                    "timestamp": "2026-07-19T08:30:00Z",
+                    "sampledValue": [
+                        {"measurand": "Energy.Active.Import.Register", "value": 5500.0}
+                    ]
+                }]
+            )
+
+        asyncio.run(run_test())
+
+        # The open transaction in Redis must now have meter_stop = 5500.0
+        set_call = mock_redis.set.call_args_list
+        # Find the call that writes back the open_tx key
+        tx_writes = [c for c in set_call if f"open_tx:test_cp:{tx_id}" in str(c)]
+        self.assertTrue(len(tx_writes) > 0, "Updated event should write back to Redis")
+        saved = json.loads(tx_writes[-1][0][1])
+        self.assertEqual(saved["meter_stop"], 5500.0)
+
+    @patch("ocpp_ws.redis_client")
+    def test_updated_event_keeps_highest_meter_value(self, mock_redis):
+        """Multiple Updated events: meter_stop should always reflect the
+        highest reading (cumulative register)."""
+        cp = CentralSystemCP201("test_cp", MagicMock())
+        cp.redis = mock_redis
+
+        tx_id = "tx_cumulative"
+        open_entry = {
+            "transaction_id": tx_id,
+            "charge_point": "test_cp",
+            "connectorId": 1,
+            "id_tag": "TAG1",
+            "meter_start": 0.0,
+            "meter_stop": 3000.0,       # already accumulated from a previous Updated event
+            "start_time": "2026-07-19T08:00:00Z",
+        }
+        mock_redis.get.return_value = json.dumps(open_entry).encode()
+
+        import asyncio
+        async def run_test():
+            # Send a reading lower than the current meter_stop — should be ignored
+            await cp.on_transaction_event(
+                event_type="Updated",
+                timestamp="2026-07-19T09:00:00Z",
+                trigger_reason="MeterValuePeriodic",
+                seq_no=10,
+                transaction_info={"transactionId": tx_id},
+                evse={"id": 1},
+                meterValue=[{
+                    "sampledValue": [
+                        {"measurand": "Energy.Active.Import.Register", "value": 2000.0}
+                    ]
+                }]
+            )
+
+        asyncio.run(run_test())
+
+        # meter_stop should NOT have been overwritten with the lower value
+        tx_writes = [c for c in mock_redis.set.call_args_list
+                     if f"open_tx:test_cp:{tx_id}" in str(c)]
+        # Either no write (because nothing changed) or if written, value should stay 3000
+        if tx_writes:
+            saved = json.loads(tx_writes[-1][0][1])
+            self.assertEqual(saved["meter_stop"], 3000.0)
+
+    @patch("ocpp_ws.redis_client")
+    @patch("ocpp_ws.load_rfids_map", return_value={"LATE_TAG": {"alias": "Hugo", "user_email": "hugo@example.com"}})
+    @patch("ocpp_ws.load_json", return_value={})
+    @patch("ocpp_ws.enrich_transaction_snapshot", side_effect=lambda x, **kwargs: x)
+    def test_updated_event_resolves_unknown_tag(self, mock_enrich, mock_load, mock_rfids, mock_redis):
+        """If the Started event couldn't determine the user (tag=UNKNOWN),
+        an Updated event carrying an idToken must fix it."""
+        cp = CentralSystemCP201("test_cp", MagicMock())
+        cp.redis = mock_redis
+
+        tx_id = "tx_late_auth"
+        open_entry = {
+            "transaction_id": tx_id,
+            "charge_point": "test_cp",
+            "connectorId": 1,
+            "id_tag": "UNKNOWN",
+            "meter_start": 0.0,
+            "meter_stop": None,
+            "start_time": "2026-07-19T08:00:00Z",
+        }
+        mock_redis.get.return_value = json.dumps(open_entry).encode()
+
+        import asyncio
+        async def run_test():
+            await cp.on_transaction_event(
+                event_type="Updated",
+                timestamp="2026-07-19T08:01:00Z",
+                trigger_reason="Authorized",
+                seq_no=2,
+                transaction_info={"transactionId": tx_id},
+                evse={"id": 1},
+                idToken={"idToken": "late_tag"},
+            )
+
+        asyncio.run(run_test())
+
+        tx_writes = [c for c in mock_redis.set.call_args_list
+                     if f"open_tx:test_cp:{tx_id}" in str(c)]
+        self.assertTrue(len(tx_writes) > 0, "Updated event should write back to Redis when tag resolved")
+        saved = json.loads(tx_writes[-1][0][1])
+        self.assertEqual(saved["id_tag"], "LATE_TAG")
+        self.assertEqual(saved["tag_alias"], "Hugo")
+
+    @patch("ocpp_ws.redis_client")
+    def test_updated_event_no_open_tx_is_safe(self, mock_redis):
+        """If no open transaction exists in Redis (e.g. after a restart),
+        the Updated event must not crash."""
+        cp = CentralSystemCP201("test_cp", MagicMock())
+        cp.redis = mock_redis
+        mock_redis.get.return_value = None  # no open transaction
+
+        import asyncio
+        async def run_test():
+            await cp.on_transaction_event(
+                event_type="Updated",
+                timestamp="2026-07-19T08:30:00Z",
+                trigger_reason="MeterValuePeriodic",
+                seq_no=5,
+                transaction_info={"transactionId": "orphan_tx"},
+                evse={"id": 1},
+                meterValue=[{
+                    "sampledValue": [
+                        {"measurand": "Energy.Active.Import.Register", "value": 1234.0}
+                    ]
+                }]
+            )
+
+        # Must not raise
+        asyncio.run(run_test())
+
+    @patch("ocpp_ws.redis_client")
+    @patch("ocpp_ws.load_rfids_map", return_value={})
+    @patch("ocpp_ws.load_json", return_value=[])
+    @patch("ocpp_ws.save_json")
+    @patch("ocpp_ws.enrich_transaction_snapshot", side_effect=lambda x, **kwargs: x)
+    def test_ended_uses_meter_stop_from_updated_events(self, mock_enrich, mock_save, mock_load, mock_rfids, mock_redis):
+        """End-to-end: if Updated events accumulated meter_stop in the open
+        transaction and the Ended event carries NO meter data, the final
+        transaction must still show the correct energy consumption."""
+        cp = CentralSystemCP201("test_cp", MagicMock())
+        cp.redis = mock_redis
+
+        tx_id = "tx_e2e"
+        # Simulate a transaction where Updated events already set meter_stop
+        open_entry = {
+            "transaction_id": tx_id,
+            "charge_point": "test_cp",
+            "connectorId": 1,
+            "id_tag": "TAG1",
+            "tag_alias": "Hugo",
+            "user_email": "hugo@example.com",
+            "meter_start": 1000.0,
+            "meter_stop": 8500.0,      # accumulated from Updated events
+            "start_time": "2026-07-19T08:00:00Z",
+        }
+        mock_redis.get.return_value = json.dumps(open_entry).encode()
+
+        import asyncio
+        async def run_test():
+            # Ended event with NO meterValue — common on some charger firmwares
+            await cp.on_transaction_event(
+                event_type="Ended",
+                timestamp="2026-07-19T10:00:00Z",
+                trigger_reason="EVDeparted",
+                seq_no=20,
+                transaction_info={"transactionId": tx_id},
+                evse={"id": 1},
+                # NOTE: no meterValue at all
+            )
+
+        asyncio.run(run_test())
+
+        txs = mock_save.call_args[0][1]
+        entry = txs[-1]
+        self.assertEqual(entry["meter_start"], 1000.0)
+        self.assertEqual(entry["meter_stop"], 8500.0)
+        self.assertEqual(entry["stop_time"], "2026-07-19T10:00:00Z")
+        # Energy = (8500 - 1000) / 1000 = 7.5 kWh — provable from the saved data
+
+    @patch("ocpp_ws.redis_client")
+    @patch("ocpp_ws.load_rfids_map", return_value={})
+    @patch("ocpp_ws.load_json", return_value=[])
+    @patch("ocpp_ws.save_json")
+    @patch("ocpp_ws.enrich_transaction_snapshot", side_effect=lambda x, **kwargs: x)
+    def test_ended_meter_overrides_updated_when_present(self, mock_enrich, mock_save, mock_load, mock_rfids, mock_redis):
+        """If the Ended event DOES carry Transaction.End meter data, that
+        value should override the one accumulated from Updated events."""
+        cp = CentralSystemCP201("test_cp", MagicMock())
+        cp.redis = mock_redis
+
+        tx_id = "tx_override"
+        open_entry = {
+            "transaction_id": tx_id,
+            "charge_point": "test_cp",
+            "connectorId": 1,
+            "id_tag": "TAG1",
+            "meter_start": 1000.0,
+            "meter_stop": 8500.0,      # from Updated events
+            "start_time": "2026-07-19T08:00:00Z",
+        }
+        mock_redis.get.return_value = json.dumps(open_entry).encode()
+
+        import asyncio
+        async def run_test():
+            await cp.on_transaction_event(
+                event_type="Ended",
+                timestamp="2026-07-19T10:00:00Z",
+                trigger_reason="EVDeparted",
+                seq_no=20,
+                transaction_info={"transactionId": tx_id},
+                evse={"id": 1},
+                meterValue=[{
+                    "sampledValue": [{
+                        "context": "Transaction.End",
+                        "measurand": "Energy.Active.Import.Register",
+                        "value": 9000.0
+                    }]
+                }]
+            )
+
+        asyncio.run(run_test())
+
+        txs = mock_save.call_args[0][1]
+        entry = txs[-1]
+        self.assertEqual(entry["meter_stop"], 9000.0)
 
 if __name__ == "__main__":
     unittest.main()

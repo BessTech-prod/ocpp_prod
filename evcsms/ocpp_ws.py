@@ -1376,6 +1376,66 @@ class CentralSystemCP201(CP201):
             except Exception as e:
                 logger.error("Failed to save 2.0.1 transaction: %s", e)
 
+        elif event_type == "Updated":
+            # ── Handle Updated events (periodic meter values & deferred auth) ──
+            # In OCPP 2.0.1 there is no separate MeterValues message; chargers
+            # report intermediate readings via TransactionEvent/Updated.  Without
+            # processing these, meter_stop is only set if the Ended event happens
+            # to carry meter data — which many chargers do NOT do.
+            tx_key = f"open_tx:{self.id}:{tx_id}"
+            tx_data = self.redis.get(tx_key)
+            if tx_data:
+                entry = json.loads(tx_data)
+                updated = False
+
+                # 1. Update meter_stop with the latest energy reading
+                for mv in meter_values:
+                    for sampled in (mv.get("sampled_value") or mv.get("sampledValue") or []):
+                        measurand = sampled.get("measurand", "Energy.Active.Import.Register")
+                        if measurand == "Energy.Active.Import.Register":
+                            try:
+                                val = float(sampled.get("value", 0))
+                                prev = entry.get("meter_stop")
+                                # Keep the highest reading (meter is cumulative)
+                                if prev is None or val > prev:
+                                    entry["meter_stop"] = val
+                                    updated = True
+                            except (ValueError, TypeError):
+                                pass
+
+                # 2. Resolve idToken if the tag is still unknown
+                if entry.get("id_tag") == "UNKNOWN" or not entry.get("id_tag"):
+                    id_token = kwargs.get("id_token") or kwargs.get("idToken")
+                    if id_token:
+                        token_dict = make_json_safe(id_token)
+                        resolved = normalize_tag(
+                            token_dict.get("id_token") or token_dict.get("idToken")
+                        )
+                        if resolved and resolved != "UNKNOWN":
+                            entry["id_tag"] = resolved
+                            self.track_tag(resolved, evse_id)
+                            # Re-enrich with the newly discovered tag
+                            try:
+                                rfids = load_rfids_map()
+                                rfid = rfids.get(resolved, {})
+                                entry["tag_alias"] = rfid.get("alias") or resolved
+                                entry["user_email"] = rfid.get("user_email") or entry.get("user_email")
+                                entry = enrich_transaction_snapshot(
+                                    entry,
+                                    rfids_map=rfids,
+                                    cps_map=load_json(CPS_FILE, {}),
+                                    users_map=load_json(USERS_FILE, {}),
+                                    orgs_map=load_json(ORGS_FILE, {}),
+                                )
+                            except Exception:
+                                pass
+                            updated = True
+                            logger.info("[%s] Updated event resolved tag to %s for tx %s",
+                                        self.id, resolved, tx_id)
+
+                if updated:
+                    self.redis.set(tx_key, json.dumps(entry))
+
         elif event_type == "Ended":
             tx_key = f"open_tx:{self.id}:{tx_id}"
             tx_data = self.redis.get(tx_key)
@@ -1385,7 +1445,9 @@ class CentralSystemCP201(CP201):
                 
                 # In Ended events, some chargers send both Begin and End meter values.
                 meter_start = entry.get("meter_start", 0.0)
-                meter_stop = entry.get("meter_stop") or meter_start
+                # Prefer meter_stop already accumulated from Updated events
+                prev_meter_stop = entry.get("meter_stop")
+                meter_stop = prev_meter_stop if prev_meter_stop is not None else meter_start
                 for mv in meter_values:
                     for sampled in (mv.get("sampled_value") or mv.get("sampledValue") or []):
                         measurand = sampled.get("measurand", "Energy.Active.Import.Register")
