@@ -169,6 +169,36 @@
     document.querySelectorAll("#navDashboard, .js-go-dashboard").forEach(el=>{
       el.addEventListener("click", (e)=>{ e.preventDefault(); UI.goToDashboard(); });
     });
+    UI.setupUserMobileNav(me);
+  };
+
+  /* ---- User mobile bottom tab bar (phone-only, ≤576px via CSS) ---- */
+  UI.setupUserMobileNav = function setupUserMobileNav(me){
+    if (!me || (me.role || '').toLowerCase() !== 'user') return;
+    if (document.querySelector('.user-bottom-nav')) return;
+
+    var path = window.location.pathname.replace(/\.html$/, '').replace(/\/$/, '');
+    var tabs = [
+      { href: '/user/index', icon: 'bi-speedometer2', label: 'Överblick' },
+      { href: '/user/history', icon: 'bi-clock-history', label: 'Historik' },
+      { href: '/user/my', icon: 'bi-person-badge', label: 'Statistik' }
+    ];
+
+    var nav = document.createElement('nav');
+    nav.className = 'user-bottom-nav';
+    nav.setAttribute('aria-label', 'Mobilnavigering');
+
+    tabs.forEach(function(tab){
+      var a = document.createElement('a');
+      a.href = tab.href;
+      a.className = 'tab-item' + (path === tab.href ? ' active' : '');
+      a.setAttribute('aria-current', path === tab.href ? 'page' : 'false');
+      a.innerHTML = '<i class="bi ' + tab.icon + '"></i><span>' + tab.label + '</span>';
+      nav.appendChild(a);
+    });
+
+    document.body.appendChild(nav);
+    document.body.classList.add('user-has-bottom-nav');
   };
 
   UI.setupModernLayout = function setupModernLayout(me) {

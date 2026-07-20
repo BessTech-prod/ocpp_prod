@@ -36,7 +36,7 @@
     });
 
     host.innerHTML = `
-      <div class="col-6 col-lg-4">
+      <div class="col-4">
         <div class="card border-0 shadow-sm">
           <div class="card-body">
             <div class="d-flex align-items-center mb-1">
@@ -47,7 +47,7 @@
           </div>
         </div>
       </div>
-      <div class="col-6 col-lg-4">
+      <div class="col-4">
         <div class="card border-0 shadow-sm">
           <div class="card-body">
             <div class="d-flex align-items-center mb-1">
@@ -58,7 +58,7 @@
           </div>
         </div>
       </div>
-      <div class="col-6 col-lg-4">
+      <div class="col-4">
         <div class="card border-0 shadow-sm">
           <div class="card-body">
             <div class="d-flex align-items-center mb-1">
@@ -118,7 +118,8 @@
         UI.getJSON(API.status)
       ]);
       renderGrid(cpsRes?.connected || [], statusRes || {}, cpsRes?.aliases || {});
-      const ts = $('#last-refresh'); if(ts) ts.textContent = 'Senast: ' + new Date().toLocaleTimeString();
+      const ts = $('#last-refresh');
+      if(ts) ts.textContent = 'Uppdaterad ' + new Date().toLocaleTimeString('sv-SE');
     }catch(e){
       if(String(e).includes('401')){ if(timer){ clearInterval(timer); timer=null; } return; }
       console.error(e);
@@ -130,6 +131,9 @@
     const me = await UI.initPage({ requiredRoles:['user'] }); if(!me) return;
 
     setDashboardHeading(me);
+
+    // Manual refresh button
+    $('#btnManualRefresh')?.addEventListener('click', ()=>{ tick(); });
 
     // Start poll
     await tick();
