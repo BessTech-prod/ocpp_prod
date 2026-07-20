@@ -827,8 +827,11 @@ body.user-has-bottom-nav main {
 
 /* Phone-specific layout adjustments */
 @media (max-width: 576px) {
-  /* Hide top navbar on phone when bottom tab bar is active */
-  body.user-has-bottom-nav > .navbar {
+  /* Keep navbar visible for branding but hide navigation buttons on phone */
+  body.user-has-bottom-nav > .navbar .navbar-toggler {
+    display: none !important;
+  }
+  body.user-has-bottom-nav > .navbar .navbar-collapse {
     display: none !important;
   }
 
