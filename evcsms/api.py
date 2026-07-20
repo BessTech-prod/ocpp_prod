@@ -1472,6 +1472,98 @@ async def api_portal_ocpp_command_status(command_id: str, session=Depends(requir
     return json.loads(raw.decode())
 
 # =====================================================================
+# USER REMOTE START  (any logged-in user)
+# =====================================================================
+
+class UserRemoteStartBody(BaseModel):
+    cp_id: str
+    connector_id: int = 1
+
+@app.post("/api/user/remote-start")
+async def api_user_remote_start(body: UserRemoteStartBody, session=Depends(require_auth)):
+    """Let any logged-in user remotely start a charging session.
+
+    The user's RFID tag is resolved automatically from their account –
+    no manual id-tag entry required.
+    """
+    cp_id = (body.cp_id or "").strip()
+    if not cp_id:
+        raise HTTPException(400, "cp_id krävs")
+
+    connector_id = body.connector_id
+    if connector_id < 1:
+        raise HTTPException(400, "connector_id måste vara minst 1")
+
+    # ── Organisation check ──────────────────────────────────────────
+    user_org = session.get("org_id")
+    cp_org = org_for_cp(cp_id)
+    role = (session.get("role") or "").lower()
+    if role not in ("portal_admin", "admin", "installer") and user_org and cp_org != user_org:
+        raise HTTPException(403, "Laddaren tillhör inte din organisation")
+
+    # ── Resolve the user's RFID tag ─────────────────────────────────
+    email = (session.get("email") or "").strip().lower()
+    rfids = load_rfids_map()
+
+    # Prefer active tags from rfids.json linked to this user's email
+    id_tag = None
+    for tag, entry in rfids.items():
+        rfid_email = (entry.get("user_email") or "").strip().lower()
+        if rfid_email == email and entry.get("active", True):
+            id_tag = normalize_tag(tag)
+            break
+
+    # Fallback: look in users.json (keyed by RFID tag)
+    if not id_tag:
+        users = load_users_map()
+        tag_found, _ = find_user_by_email(users, email)
+        if tag_found:
+            id_tag = normalize_tag(tag_found)
+
+    if not id_tag:
+        raise HTTPException(400, "Inget RFID-kort är kopplat till ditt konto. Kontakta din administratör.")
+
+    # ── Charger must be connected ───────────────────────────────────
+    connected = {cp.decode() for cp in redis_client.smembers("connected_cps")}
+    if cp_id not in connected:
+        raise HTTPException(409, "Laddaren är inte ansluten")
+
+    # ── Queue the command (same mechanism as portal) ────────────────
+    command_id = str(uuid.uuid4())
+    envelope = {
+        "command_id": command_id,
+        "cp_id": cp_id,
+        "command": "remote_start_transaction",
+        "payload": {"id_tag": id_tag, "connector_id": connector_id},
+        "requested_by": email,
+        "requested_at": iso_now(),
+    }
+
+    result_key = f"ocpp:command_result:{command_id}"
+    redis_client.setex(
+        result_key,
+        600,
+        json.dumps({
+            "command_id": command_id,
+            "status": "queued",
+            "cp_id": cp_id,
+            "command": "remote_start_transaction",
+            "requested_at": envelope["requested_at"],
+        }),
+    )
+
+    redis_client.rpush("ocpp:commands", json.dumps(envelope))
+    return {"ok": True, "command_id": command_id, "status": "queued"}
+
+@app.get("/api/user/remote-start/{command_id}")
+async def api_user_remote_start_status(command_id: str, session=Depends(require_auth)):
+    """Poll the result of a user-initiated remote start command."""
+    raw = redis_client.get(f"ocpp:command_result:{command_id}")
+    if not raw:
+        raise HTTPException(404, "Kommandoresultat saknas eller har löpt ut")
+    return json.loads(raw.decode())
+
+# =====================================================================
 # USERS API
 # =====================================================================
 @app.get("/api/users/map")

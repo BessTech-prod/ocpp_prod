@@ -865,3 +865,22 @@ body.user-has-bottom-nav main {
     transition: none;
   }
 }
+
+/* =============== Remote-start pop-up =============== */
+.remote-start-popup {
+  animation: rs-slide-in .35s ease-out;
+  border-left: 4px solid var(--bs-warning, #f59e0b);
+}
+@keyframes rs-slide-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.remote-start-popup .btn-start-charge {
+  min-width: 120px;
+}
+.remote-start-popup.rs-success {
+  border-left-color: var(--bs-success, #10b981);
+}
+.remote-start-popup.rs-error {
+  border-left-color: var(--bs-danger, #ef4444);
+}
