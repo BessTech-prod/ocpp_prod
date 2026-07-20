@@ -2892,10 +2892,11 @@ def _history_rows_for_session(days: int, tag: Optional[str], session: dict) -> L
         # Filtering for org_admin/user
         if allowed is not None:
             tx_org = tx.get("org_id")
-            # If the transaction itself is marked with the user's org, show it
-            if tx_org and tx_org == session_org_id:
-                pass 
-            # Otherwise, check if the tag belongs to the user's allowed set
+            role = (session.get("role") or "").lower()
+            # org_admin sees all sessions in their org
+            if role != "user" and tx_org and tx_org == session_org_id:
+                pass
+            # Users only see their own tagged sessions
             elif tg not in allowed:
                 continue
 
