@@ -197,6 +197,19 @@
       nav.appendChild(a);
     });
 
+    /* Logout tab */
+    var logout = document.createElement('a');
+    logout.href = '#';
+    logout.className = 'tab-item';
+    logout.innerHTML = '<i class="bi bi-box-arrow-right"></i><span>Logga ut</span>';
+    logout.addEventListener('click', function(e){
+      e.preventDefault();
+      fetch('/api/auth/logout', { method: 'POST' })
+        .catch(function(){})
+        .then(function(){ window.location.href = '/login'; });
+    });
+    nav.appendChild(logout);
+
     document.body.appendChild(nav);
     document.body.classList.add('user-has-bottom-nav');
   };
